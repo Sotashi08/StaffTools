@@ -1,0 +1,54 @@
+{
+  "chatMentionsEnabled": false,
+  "clickToCopyEnabled": false,
+  "playerActionsEnabled": true,
+  "dangerousMacroConfirmation": true,
+  "toastsEnabled": true,
+  "language": "ru",
+  "macros": [
+    {
+      "id": "3e2e6078-8ae2-4e36-b3da-6f0c3c521a17",
+      "name": "Флуд 👑",
+      "description": "Мут 30 минут",
+      "commands": [
+        "/mute \u003cplayer\u003e 30m flood"
+      ],
+      "aliases": [],
+      "enabled": true,
+      "dangerous": true,
+      "confirmationRequired": true
+    },
+    {
+      "id": "d397042c-e917-48c0-8918-dd697f45935d",
+      "name": "Читы ⚡",
+      "description": "Бан за читы",
+      "commands": [
+        "/ban \u003cplayer\u003e 30d Читы"
+      ],
+      "aliases": [],
+      "enabled": true,
+      "dangerous": true,
+      "confirmationRequired": true
+    }
+  ],
+  "actionEntries": [
+    {
+      "icon": "❤",
+      "label": "Размут",
+      "command": "/unmute \u003cplayer\u003e",
+      "copyName": false,
+      "enabled": true,
+      "dangerous": false,
+      "confirmationRequired": false
+    },
+    {
+      "icon": "🔑",
+      "label": "Разбан",
+      "command": "/unban \u003cplayer\u003e",
+      "copyName": false,
+      "enabled": true,
+      "dangerous": false,
+      "confirmationRequired": false
+    }
+  ]
+}
