@@ -113,6 +113,40 @@ public abstract class StScreen extends Screen {
         return widget;
     }
 
+    /**
+     * Static darkened backdrop. Overrides the vanilla one because it
+     * applies its own animated blur on screen transitions — that was
+     * the "jumping background" bug.
+     */
+    /**
+     * When true, renderBackground does nothing. super.render() draws the
+     * vanilla background itself; we suppress it there and keep only our
+     * own static backdrop drawn outside the animated matrix.
+     */
+    private boolean suppressBackground;
+
+    @Override
+    public void renderBackground(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float delta
+    ) {
+
+        if (suppressBackground) {
+            return;
+        }
+
+        context.fillGradient(
+                0,
+                0,
+                width,
+                height,
+                0x90101216,
+                0xC410141A
+        );
+    }
+
     @Override
     public void render(
             DrawContext context,
@@ -123,19 +157,21 @@ public abstract class StScreen extends Screen {
 
         float alpha = entrance();
 
+        // static: the darkened backdrop must NOT animate,
+        // otherwise it slides and leaves a gap at the top
+        renderBackground(
+                context,
+                mouseX,
+                mouseY,
+                delta
+        );
+
         context.getMatrices().push();
 
         context.getMatrices().translate(
                 0,
                 (1 - alpha) * 14,
                 0
-        );
-
-        renderBackground(
-                context,
-                mouseX,
-                mouseY,
-                delta
         );
 
         renderTheme(
@@ -146,12 +182,19 @@ public abstract class StScreen extends Screen {
                 alpha
         );
 
+        // super.render() draws widgets AND its own background; the flag
+        // suppresses that background so only our static one (drawn
+        // above, outside the matrix) remains visible.
+        suppressBackground = true;
+
         super.render(
                 context,
                 mouseX,
                 mouseY,
                 delta
         );
+
+        suppressBackground = false;
 
         renderOverlay(
                 context,

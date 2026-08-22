@@ -56,6 +56,17 @@ public final class Lang {
         public static final String BTN_CLEAR = "btn.clear";
         public static final String BTN_ON = "btn.on";
         public static final String BTN_OFF = "btn.off";
+        public static final String BTN_THEMES = "btn.themes";
+
+        // Themes
+        public static final String THEME_OCEAN = "theme.ocean";
+        public static final String THEME_EMERALD = "theme.emerald";
+        public static final String THEME_AMETHYST = "theme.amethyst";
+        public static final String THEME_CRIMSON = "theme.crimson";
+        public static final String THEME_DAWN = "theme.dawn";
+        public static final String THEME_AURORA = "theme.aurora";
+        public static final String THEME_NEON = "theme.neon";
+        public static final String THEME_SUNSET = "theme.sunset";
 
         // Toggles
         public static final String TOGGLE_CHAT_MENTIONS = "toggle.chatMentions";
@@ -74,9 +85,19 @@ public final class Lang {
         public static final String LABEL_COMMAND = "label.command";
         public static final String LABEL_COMMAND_HINT = "label.commandHint";
         public static final String LABEL_PLACEHOLDERS = "label.placeholders";
+        public static final String LABEL_ALIASES = "label.aliases";
         public static final String LABEL_ICON = "label.icon";
         public static final String LABEL_ACTION = "label.action";
         public static final String LABEL_SETTINGS = "label.settings";
+
+        // Placeholder hints
+        public static final String PH_PLAYER = "ph.player";
+        public static final String PH_STAFF = "ph.staff";
+        public static final String PH_X = "ph.x";
+        public static final String PH_Y = "ph.y";
+        public static final String PH_Z = "ph.z";
+        public static final String PH_PING = "ph.ping";
+        public static final String PH_SERVER = "ph.server";
 
         // Messages
         public static final String MSG_SELECT_MACRO = "msg.selectMacro";
@@ -85,6 +106,7 @@ public final class Lang {
         public static final String MSG_UNNAMED = "msg.unnamed";
         public static final String MSG_ACTIONS_HINT = "msg.actionsHint";
         public static final String MSG_EMOJI_HINT = "msg.emojiHint";
+        public static final String MSG_ALIAS_HELP = "msg.aliasHelp";
         public static final String MSG_NO_ACTIONS = "msg.noActions";
         public static final String MSG_NO_HISTORY = "msg.noHistory";
         public static final String MSG_HISTORY_HINT = "msg.historyHint";
@@ -98,6 +120,7 @@ public final class Lang {
         public static final String OVERLAY_HINT_DRAG = "overlay.hintDrag";
         public static final String OVERLAY_NP = "overlay.np";
         public static final String OVERLAY_COPY_NAME = "overlay.copyName";
+        public static final String OVERLAY_ALIAS_TITLE = "overlay.aliasTitle";
 
         // Chat hover
         public static final String HOVER_CLICK = "hover.click";
@@ -155,6 +178,16 @@ public final class Lang {
         ru.put(Key.BTN_CLEAR, "Очистить");
         ru.put(Key.BTN_ON, "Вкл");
         ru.put(Key.BTN_OFF, "Выкл");
+        ru.put(Key.BTN_THEMES, "Темы");
+
+        ru.put(Key.THEME_OCEAN, "Океан");
+        ru.put(Key.THEME_EMERALD, "Изумруд");
+        ru.put(Key.THEME_AMETHYST, "Аметист");
+        ru.put(Key.THEME_CRIMSON, "Кримзон");
+        ru.put(Key.THEME_DAWN, "Рассвет");
+        ru.put(Key.THEME_AURORA, "Аврора");
+        ru.put(Key.THEME_NEON, "Неон");
+        ru.put(Key.THEME_SUNSET, "Закат");
 
         ru.put(Key.TOGGLE_CHAT_MENTIONS, "Упоминания в чате");
         ru.put(Key.TOGGLE_COPY_NAME, "Копировать имя");
@@ -171,6 +204,7 @@ public final class Lang {
         ru.put(Key.LABEL_COMMAND, "Команда");
         ru.put(Key.LABEL_COMMAND_HINT, "(поддерживается <player>)");
         ru.put(Key.LABEL_PLACEHOLDERS, "Плейсхолдеры");
+        ru.put(Key.LABEL_ALIASES, "Алиасы");
         ru.put(Key.LABEL_ICON, "Иконка");
         ru.put(Key.LABEL_ACTION, "Действие");
         ru.put(Key.LABEL_SETTINGS, "Настройки");
@@ -187,12 +221,33 @@ public final class Lang {
 
         ru.put(Key.OVERLAY_NO_ACTIONS, "Нет действий");
         ru.put(Key.OVERLAY_CUSTOM_MACROS, "Свои макросы");
-        ru.put(Key.OVERLAY_CONFIRM, "Подтвердить: %s (кликните ещё раз)");
+        ru.put(Key.OVERLAY_CONFIRM, "Ещё клик: %s");
         ru.put(Key.OVERLAY_HINT_CLOSE, "ESC — закрыть");
         ru.put(Key.OVERLAY_HINT_SCROLL, "колесо — навигация");
         ru.put(Key.OVERLAY_HINT_DRAG, "");
         ru.put(Key.OVERLAY_NP, "NP: %s");
         ru.put(Key.OVERLAY_COPY_NAME, "Копировать имя");
+        ru.put(Key.OVERLAY_ALIAS_TITLE, "Выберите пункт");
+
+        ru.put(Key.MSG_ALIAS_HELP, String.join("\n",
+                "<alias> — подстановка выбранного пункта наказания.",
+                "",
+                "Пример:",
+                "Команда: /mute <player> <alias>",
+                "Алиасы: «30m Капс», «Флуд»",
+                "Результат: /mute Notch 30m Капс",
+                "",
+                "Алиас — просто текст: время и причина пишутся в нём.",
+                "Если список пуст — <alias> заменится пустотой.",
+                "(Shift — эта справка)"));
+
+        ru.put(Key.PH_PLAYER, "Ник игрока-цели.\nПример: /mute <player> 10m → /mute Notch 10m");
+        ru.put(Key.PH_STAFF, "Ваш текущий ник.\nПример: /warn <player> проверял <staff>");
+        ru.put(Key.PH_X, "Ваша координата X (блоки).\nПример: /tp <player> <x> <y> <z>");
+        ru.put(Key.PH_Y, "Ваша координата Y (блоки).\nПример: /tp <player> <x> <y> <z>");
+        ru.put(Key.PH_Z, "Ваша координата Z (блоки).\nПример: /tp <player> <x> <y> <z>");
+        ru.put(Key.PH_PING, "Пинг цели в миллисекундах.\nПример: /warn <player> лаги (<ping> ms)");
+        ru.put(Key.PH_SERVER, "Адрес текущего сервера.\nПолезно на сетях с лобби.");
 
         ru.put(Key.HOVER_CLICK, "Клик: действия");
         ru.put(Key.HOVER_SHIFT_CLICK, "Shift+клик: скопировать имя");
@@ -237,6 +292,16 @@ public final class Lang {
         en.put(Key.BTN_CLEAR, "Clear");
         en.put(Key.BTN_ON, "On");
         en.put(Key.BTN_OFF, "Off");
+        en.put(Key.BTN_THEMES, "Themes");
+
+        en.put(Key.THEME_OCEAN, "Ocean");
+        en.put(Key.THEME_EMERALD, "Emerald");
+        en.put(Key.THEME_AMETHYST, "Amethyst");
+        en.put(Key.THEME_CRIMSON, "Crimson");
+        en.put(Key.THEME_DAWN, "Dawn");
+        en.put(Key.THEME_AURORA, "Aurora");
+        en.put(Key.THEME_NEON, "Neon");
+        en.put(Key.THEME_SUNSET, "Sunset");
 
         en.put(Key.TOGGLE_CHAT_MENTIONS, "Chat mentions");
         en.put(Key.TOGGLE_COPY_NAME, "Copy name");
@@ -253,6 +318,7 @@ public final class Lang {
         en.put(Key.LABEL_COMMAND, "Command");
         en.put(Key.LABEL_COMMAND_HINT, "(supports <player>)");
         en.put(Key.LABEL_PLACEHOLDERS, "Placeholders");
+        en.put(Key.LABEL_ALIASES, "Aliases");
         en.put(Key.LABEL_ICON, "Icon");
         en.put(Key.LABEL_ACTION, "Action");
         en.put(Key.LABEL_SETTINGS, "Settings");
@@ -269,12 +335,33 @@ public final class Lang {
 
         en.put(Key.OVERLAY_NO_ACTIONS, "No actions");
         en.put(Key.OVERLAY_CUSTOM_MACROS, "Custom macros");
-        en.put(Key.OVERLAY_CONFIRM, "Confirm: %s (click again)");
+        en.put(Key.OVERLAY_CONFIRM, "Click again: %s");
         en.put(Key.OVERLAY_HINT_CLOSE, "ESC to close");
         en.put(Key.OVERLAY_HINT_SCROLL, "scroll to navigate");
         en.put(Key.OVERLAY_HINT_DRAG, "drag by corner");
         en.put(Key.OVERLAY_NP, "NP: %s");
         en.put(Key.OVERLAY_COPY_NAME, "Copy name");
+        en.put(Key.OVERLAY_ALIAS_TITLE, "Pick an option");
+
+        en.put(Key.MSG_ALIAS_HELP, String.join("\n",
+                "<alias> inserts the selected punishment variant.",
+                "",
+                "Example:",
+                "Command: /mute <player> <alias>",
+                "Aliases: \"30m Caps\", \"Flood\"",
+                "Result: /mute Notch 30m Caps",
+                "",
+                "An alias is plain text: put duration and reason in it.",
+                "If the list is empty — <alias> becomes empty.",
+                "(Shift — this help)"));
+
+        en.put(Key.PH_PLAYER, "Target player's name.\nExample: /mute <player> 10m → /mute Notch 10m");
+        en.put(Key.PH_STAFF, "Your current nick.\nExample: /warn <player> checked by <staff>");
+        en.put(Key.PH_X, "Your X coordinate (blocks).\nExample: /tp <player> <x> <y> <z>");
+        en.put(Key.PH_Y, "Your Y coordinate (blocks).\nExample: /tp <player> <x> <y> <z>");
+        en.put(Key.PH_Z, "Your Z coordinate (blocks).\nExample: /tp <player> <x> <y> <z>");
+        en.put(Key.PH_PING, "Target latency in ms (live).\nExample: /warn <player> lagging (<ping> ms)");
+        en.put(Key.PH_SERVER, "Current server address.\nUseful on BungeeCord-style networks.");
 
         en.put(Key.HOVER_CLICK, "Click: actions");
         en.put(Key.HOVER_SHIFT_CLICK, "Shift-click: copy name");

@@ -346,22 +346,106 @@ public class MacroListScreen extends Screen {
             description = Lang.t(Key.MSG_NO_DESCRIPTION);
         }
 
-        if (textRenderer.getWidth(description) >
-                rowWidth - 210) {
+        int descWidth = rowWidth - 210;
 
-            description = textRenderer.trimToWidth(
-                    description,
-                    rowWidth - 210
-            ) + "...";
+        List<String> descLines = wrapText(
+                textRenderer,
+                description,
+                descWidth,
+                2
+        );
+
+        for (int i = 0; i < descLines.size(); i++) {
+
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(descLines.get(i)),
+                    rowLeft + 8,
+                    row.y + 16 + i * 10,
+                    0x888888
+            );
+        }
+    }
+
+    /** Word-aware wrap; hard-trims overlong words, caps line count. */
+    private static List<String> wrapText(
+            net.minecraft.client.font.TextRenderer tr,
+            String text,
+            int maxWidth,
+            int maxLines
+    ) {
+
+        List<String> lines = new ArrayList<>();
+
+        StringBuilder current = new StringBuilder();
+
+        for (String word : text.split(" ")) {
+
+            if (lines.size() >= maxLines) {
+                break;
+            }
+
+            String candidate =
+                    current.length() == 0
+                            ? word
+                            : current + " " + word;
+
+            if (tr.getWidth(candidate) <= maxWidth) {
+                current = new StringBuilder(candidate);
+                continue;
+            }
+
+            if (current.length() > 0) {
+                lines.add(current.toString());
+                current = new StringBuilder();
+            }
+
+            if (lines.size() >= maxLines) {
+                break;
+            }
+
+            while (tr.getWidth(word) > maxWidth
+                    && word.length() > 1) {
+
+                word = word.substring(
+                        0,
+                        word.length() - 1
+                );
+            }
+
+            current = new StringBuilder(word);
         }
 
-        context.drawTextWithShadow(
-                textRenderer,
-                Text.literal(description),
-                rowLeft + 8,
-                row.y + 20,
-                0x888888
-        );
+        if (current.length() > 0
+                && lines.size() < maxLines) {
+
+            lines.add(current.toString());
+        }
+
+        // ellipsis when content was cut off
+        int totalWords = text.split(" ").length;
+
+        boolean truncated =
+                lines.size() == maxLines &&
+                        totalWords > String.join(
+                                " ", lines
+                        ).split(" ").length;
+
+        if (truncated && !lines.isEmpty()) {
+
+            int lastIdx = lines.size() - 1;
+
+            String last = lines.get(lastIdx);
+
+            last = tr.trimToWidth(
+                    last + "...",
+                    maxWidth
+            );
+
+            lines.set(lastIdx, last);
+        }
+
+        return lines;
     }
 
     private record Row(

@@ -98,8 +98,10 @@ public class ChatScreenMixin {
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
 
-            PlayerActionOverlay.INSTANCE.close();
-            cir.setReturnValue(true);
+            // closes the alias modal first, then the popup itself
+            cir.setReturnValue(
+                    PlayerActionOverlay.INSTANCE.handleEscape()
+            );
         }
     }
 }

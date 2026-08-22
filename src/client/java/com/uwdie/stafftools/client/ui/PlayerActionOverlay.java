@@ -40,15 +40,43 @@ public final class PlayerActionOverlay {
     private static final int GRIP_SIZE = 16;
     private static final long CONFIRM_MS = 3000L;
 
+    // alias modal geometry
+    private static final int ALIAS_HEADER_H = 28;
+    private static final int ALIAS_ROW_H = 20;
+    private static final int ALIAS_OPT_H = 15;
+
     private boolean open;
     private PlayerContext player;
     private Screen ownerScreen;
     private double anchorX;
     private double anchorY;
-    private int scroll;
+    private float scroll;
+    private float scrollTarget;
     private long openTime;
     private long confirmAt;
     private RowItem confirmItem;
+
+    // closing animation
+    private boolean closing;
+    private long closeAt;
+
+    // "just executed" flash on a row
+    private RowItem flashItem;
+    private long flashTime;
+
+    private int lastHoverRow = -1;
+
+    // alias selection modal state
+    private boolean aliasOpen;
+    private Macro aliasMacro;
+    private PlayerContext aliasTarget;
+    private List<String> aliasList = new ArrayList<>();
+    private int aliasScroll;
+    private long aliasOpenTime;
+    private int aliasGX;
+    private int aliasGY;
+    private int aliasGW;
+    private int aliasGH;
 
     private boolean manuallyPlaced;
     private boolean dragging;
@@ -84,13 +112,16 @@ public final class PlayerActionOverlay {
 
         this.player = target;
         this.open = true;
+        this.closing = false;
         this.ownerScreen = client.currentScreen;
         this.scroll = 0;
+        this.scrollTarget = 0;
         this.confirmItem = null;
         this.confirmAt = 0L;
         this.manuallyPlaced = false;
         this.dragging = false;
         this.openTime = System.currentTimeMillis();
+        this.flashItem = null;
 
         this.anchorX = client.mouse.getX();
         this.anchorY = client.mouse.getY();
@@ -99,17 +130,73 @@ public final class PlayerActionOverlay {
         layout();
     }
 
-    public void close() {
+    /**
+     * User-initiated close: plays the fade-out animation first.
+     * delayMs allows showing the "just executed" flash before closing.
+     */
+    public void requestClose(long delayMs) {
+
+        if (!open || closing) {
+            return;
+        }
+
+        closing = true;
+        closeAt = System.currentTimeMillis() + delayMs;
+
+        confirmItem = null;
+        confirmAt = 0L;
+
+        if (delayMs <= 0) {
+            clearAliasState();
+        }
+    }
+
+    private void finishClose() {
 
         this.open = false;
+        this.closing = false;
         this.player = null;
         this.ownerScreen = null;
         this.confirmItem = null;
         this.confirmAt = 0L;
         this.dragging = false;
+        this.flashItem = null;
+
+        clearAliasState();
 
         this.items.clear();
         this.rows.clear();
+    }
+
+    private void clearAliasState() {
+
+        aliasOpen = false;
+        aliasMacro = null;
+        aliasTarget = null;
+        aliasScroll = 0;
+
+        if (aliasList != null) {
+            aliasList.clear();
+        }
+    }
+
+    /**
+     * ESC handling: closes the alias modal first, then the popup.
+     * Returns true if something was closed.
+     */
+    public boolean handleEscape() {
+
+        if (aliasOpen) {
+            clearAliasState();
+            return true;
+        }
+
+        if (open) {
+            requestClose(0);
+            return true;
+        }
+
+        return false;
     }
 
     private void buildItems() {
@@ -179,8 +266,11 @@ public final class PlayerActionOverlay {
                 contentH - visibleH
         );
 
+        scrollTarget = Math.clamp(scrollTarget,
+                0f, maxScroll);
+
         scroll = Math.clamp(scroll,
-                0, maxScroll);
+                0f, maxScroll);
 
         panelW = PANEL_WIDTH;
         panelH = visibleH;
@@ -250,7 +340,7 @@ public final class PlayerActionOverlay {
                 continue;
             }
 
-            int absY = row.offset - scroll;
+            int absY = Math.round(row.offset - scroll);
 
             if (absY < contentTop - ROW_H ||
                     absY > contentBottom) {
@@ -285,7 +375,7 @@ public final class PlayerActionOverlay {
         if (client.currentScreen == null ||
                 client.currentScreen != ownerScreen) {
 
-            close();
+            finishClose();
             return;
         }
 
@@ -303,6 +393,30 @@ public final class PlayerActionOverlay {
                 (now - openTime) / 140f
         );
 
+        // closing animation: fade out and slide up
+        int riseY = 0;
+
+        if (closing) {
+
+            long passed = now - closeAt;
+
+            if (passed < 0) {
+                // delayed close (flash window) — draw normally
+            } else {
+
+                float k = Ui.clamp01(passed / 160f);
+
+                if (k >= 1f) {
+                    finishClose();
+                    return;
+                }
+
+                alpha *= (1f - k);
+                scale *= (1f - 0.03f * k);
+                riseY = -(int) (8f * Ui.easeOutCubic(k));
+            }
+        }
+
         if (confirmItem != null &&
                 now - confirmAt >= CONFIRM_MS) {
 
@@ -310,7 +424,27 @@ public final class PlayerActionOverlay {
             confirmAt = 0L;
         }
 
+        if (aliasOpen) {
+
+            drawAliasModal(
+                    context,
+                    mouseX,
+                    mouseY
+            );
+
+            return;
+        }
+
         layout();
+
+        // smooth scroll: ease `scroll` toward `scrollTarget`
+        float diff = scrollTarget - scroll;
+
+        if (Math.abs(diff) > 0.25f) {
+            scroll += diff * Math.min(1f, delta * 14f);
+        } else {
+            scroll = scrollTarget;
+        }
 
         var matrices =
                 context.getMatrices();
@@ -319,7 +453,7 @@ public final class PlayerActionOverlay {
 
         matrices.translate(
                 panelX,
-                panelY,
+                panelY + riseY,
                 0
         );
 
@@ -389,13 +523,40 @@ public final class PlayerActionOverlay {
                 Ui.argb(0x2C3B55, alpha)
         );
 
-        drawBody(
-                context,
-                tr,
-                mouseX,
-                mouseY,
-                alpha
-        );
+        // clip the scrolling list so rows never overlap
+        // the header, copy row or footer
+        int clipTop = panelY + PAD + HEADER_H + FIXED_H;
+        int clipBottom = panelY + panelH - PAD - FOOTER_H;
+
+        if (clipBottom > clipTop) {
+
+            context.enableScissor(
+                    0,
+                    clipTop,
+                    context.getScaledWindowWidth(),
+                    clipBottom
+            );
+
+            drawBody(
+                    context,
+                    tr,
+                    mouseX,
+                    mouseY,
+                    alpha
+            );
+
+            context.disableScissor();
+
+        } else {
+
+            drawBody(
+                    context,
+                    tr,
+                    mouseX,
+                    mouseY,
+                    alpha
+            );
+        }
 
         drawFooter(
                 context,
@@ -436,6 +597,182 @@ public final class PlayerActionOverlay {
         }
 
         return Integer.toString(total);
+    }
+
+    /**
+     * Centered, non-draggable alias picker with accent styling.
+     * Rows slide in left-to-right one after another. Click on an
+     * option executes the macro; ESC or outside click cancels.
+     */
+    private void drawAliasModal(
+            DrawContext context,
+            double mouseX,
+            double mouseY
+    ) {
+
+        MinecraftClient client =
+                MinecraftClient.getInstance();
+
+        TextRenderer tr = client.textRenderer;
+
+        int screenWidth =
+                client.getWindow().getScaledWidth();
+
+        int screenHeight =
+                client.getWindow().getScaledHeight();
+
+        long now = System.currentTimeMillis();
+
+        float slide = Ui.easeOutCubic(
+                Ui.clamp01(
+                        (now - aliasOpenTime) / 220f
+                )
+        );
+
+        float modalAlpha = Ui.clamp01(
+                (now - aliasOpenTime) / 160f
+        );
+
+        if (modalAlpha <= 0.01f) {
+            return;
+        }
+
+        aliasGW = 180;
+
+        int pad = 6;
+
+        int visible = Math.min(
+                aliasList.size(),
+                8
+        );
+
+        aliasGH = ALIAS_HEADER_H + visible * ALIAS_ROW_H + pad;
+
+        // whole window slides in from the left
+        int offsetX =
+                (int) ((1f - slide) * -28);
+
+        aliasGX = (screenWidth - aliasGW) / 2 + offsetX;
+        aliasGY = (screenHeight - aliasGH) / 2;
+
+        Ui.drawPanel(
+                context,
+                aliasGX,
+                aliasGY,
+                aliasGW,
+                aliasGH,
+                modalAlpha
+        );
+
+        // accent header strip
+        Ui.drawGradientH(
+                context,
+                aliasGX + 3,
+                aliasGY + 1,
+                aliasGW - 6,
+                2,
+                Ui.ACCENT,
+                Ui.ACCENT_2,
+                modalAlpha
+        );
+
+        context.drawCenteredTextWithShadow(
+                tr,
+                Lang.text(Key.OVERLAY_ALIAS_TITLE),
+                aliasGX + aliasGW / 2,
+                aliasGY + pad + 4,
+                Ui.argb(Ui.TEXT, modalAlpha)
+        );
+
+        if (aliasList.isEmpty()) {
+
+            context.drawCenteredTextWithShadow(
+                    tr,
+                    Lang.text(Key.MSG_NO_ACTIONS),
+                    aliasGX + aliasGW / 2,
+                    aliasGY + ALIAS_HEADER_H,
+                    Ui.argb(Ui.TEXT_MUTED, modalAlpha)
+            );
+
+            return;
+        }
+
+        for (int i = 0; i < visible; i++) {
+
+            int index = aliasScroll + i;
+
+            String alias = aliasList.get(index);
+
+            // staggered per-row slide-in
+            float ri = Ui.easeOutCubic(
+                    Ui.clamp01(
+                            (now - aliasOpenTime
+                                    - 70L - i * 45L) / 190f
+                    )
+            );
+
+            if (ri <= 0.02f) {
+                continue;
+            }
+
+            int rowOffsetX =
+                    (int) ((1f - ri) * -34);
+
+            // option "button": inset with a gap below the previous one
+            int ry = aliasGY + ALIAS_HEADER_H
+                    + i * ALIAS_ROW_H;
+
+            int ox = aliasGX + PAD;
+            int oy = ry + 2;
+            int ow = aliasGW - PAD * 2;
+            int oh = ALIAS_OPT_H;
+
+            boolean hovered =
+                    mouseX >= ox &&
+                            mouseX <= ox + ow &&
+                            mouseY >= oy &&
+                            mouseY < oy + oh;
+
+            if (hovered) {
+
+                context.fill(
+                        ox + rowOffsetX,
+                        oy,
+                        ox + ow + rowOffsetX,
+                        oy + oh,
+                        Ui.argb(0x403F8AE0, modalAlpha)
+                );
+            }
+
+            Ui.drawRoundBorder(
+                    context,
+                    ox + rowOffsetX,
+                    oy,
+                    ow,
+                    oh,
+                    3,
+                    Ui.argb(
+                            hovered ? Ui.ACCENT : 0xFF3A4A66,
+                            modalAlpha * ri
+                    )
+            );
+
+            String label = tr.trimToWidth(
+                    alias,
+                    ow - 8
+            );
+
+            context.drawTextWithShadow(
+                    tr,
+                    Text.literal(label),
+                    ox + 4 + rowOffsetX,
+                    oy + (oh - 9) / 2,
+                    Ui.argb(
+                            hovered ? Ui.ACCENT_SOFT : Ui.TEXT,
+                            modalAlpha * ri
+                    )
+            );
+        }
     }
 
     private void drawCopyRow(
@@ -526,9 +863,14 @@ public final class PlayerActionOverlay {
             );
         }
 
-        for (Row row : rows) {
+        int hoverNow = -1;
 
-            int absY = row.offset - scroll;
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+
+            Row row = rows.get(rowIndex);
+
+            float absYf = row.offset - scroll;
+            int absY = Math.round(absYf);
 
             if (row.item.separator) {
 
@@ -565,6 +907,10 @@ public final class PlayerActionOverlay {
             boolean confirming =
                     confirmItem == row.item;
 
+            boolean flashing =
+                    flashItem == row.item &&
+                            now - flashTime < 300L;
+
             int bg = 0;
 
             if (confirming) {
@@ -572,6 +918,8 @@ public final class PlayerActionOverlay {
                         0xFF8A2B2B,
                         alpha * (0.30f + 0.70f * remain)
                 );
+            } else if (flashing) {
+                bg = Ui.argb(0x4055DD77, alpha);
             } else if (hovered) {
                 bg = Ui.argb(0x403F8AE0, alpha);
             }
@@ -590,6 +938,8 @@ public final class PlayerActionOverlay {
             int borderColor =
                     confirming
                             ? Ui.DANGER
+                            : flashing
+                            ? Ui.SUCCESS
                             : hovered
                             ? Ui.ACCENT
                             : 0xFF2C3B55;
@@ -637,28 +987,19 @@ public final class PlayerActionOverlay {
                     absY + (ROW_H - 9) / 2,
                     Ui.argb(color, alpha)
             );
+
+            if (hovered) {
+                hoverNow = rowIndex;
+            }
         }
 
-        if (confirmItem != null) {
+        // hover tick sound on row change
+        if (hoverNow != lastHoverRow) {
+            lastHoverRow = hoverNow;
 
-            long secsLeft = Math.max(
-                    1,
-                    (CONFIRM_MS - (now - confirmAt) + 999)
-                            / 1000
-            );
-
-            String hint = Lang.t(
-                    Key.OVERLAY_CONFIRM,
-                    confirmItem.label
-            ) + " · " + secsLeft + "s";
-
-            context.drawTextWithShadow(
-                    tr,
-                    Text.literal(hint),
-                    PAD,
-                    contentBottom + 3,
-                    Ui.argb(Ui.DANGER_SOFT, alpha)
-            );
+            if (hoverNow >= 0) {
+                Ui.playHover();
+            }
         }
     }
 
@@ -765,7 +1106,64 @@ public final class PlayerActionOverlay {
             return false;
         }
 
+        // swallow clicks while the close animation plays
+        if (closing) {
+            return true;
+        }
+
         if (button != 0) {
+            return true;
+        }
+
+        // alias modal swallows all clicks
+        if (aliasOpen) {
+
+            boolean inside =
+                    mouseX >= aliasGX &&
+                            mouseX <= aliasGX + aliasGW &&
+                            mouseY >= aliasGY &&
+                            mouseY <= aliasGY + aliasGH;
+
+            if (inside && !aliasList.isEmpty()) {
+
+                int startY =
+                        aliasGY + ALIAS_HEADER_H + 2;
+
+                // floor, not truncation: clicks above the first
+                // option must give a negative row
+                int row = (int) Math.floor(
+                        (mouseY - startY) / ALIAS_ROW_H
+                );
+
+                boolean withinOptionY =
+                        mouseY >= startY + row * ALIAS_ROW_H &&
+                                mouseY < startY + row * ALIAS_ROW_H
+                                        + ALIAS_OPT_H;
+
+                int index = aliasScroll + row;
+
+                if (row >= 0 &&
+                        withinOptionY &&
+                        index < aliasList.size()) {
+
+                    String alias = aliasList.get(index);
+
+                    MacroExecutor.executeWithAlias(
+                            aliasMacro,
+                            aliasTarget,
+                            alias
+                    );
+
+                    Toasts.INSTANCE.success(
+                            Lang.t(Key.TOAST_EXECUTED,
+                                    aliasMacro.getName())
+                    );
+                }
+            }
+
+            // any click (option or outside) finishes the flow
+            requestClose(0);
+
             return true;
         }
 
@@ -782,7 +1180,7 @@ public final class PlayerActionOverlay {
         }
 
         if (!insidePanel(mouseX, mouseY)) {
-            close();
+            requestClose(0);
             return false;
         }
 
@@ -848,13 +1246,41 @@ public final class PlayerActionOverlay {
             return false;
         }
 
+        if (aliasOpen) {
+
+            if (mouseX >= aliasGX &&
+                    mouseX <= aliasGX + aliasGW &&
+                    mouseY >= aliasGY &&
+                    mouseY <= aliasGY + aliasGH) {
+
+                int visible = Math.min(
+                        aliasList.size(),
+                        8
+                );
+
+                int maxScroll = Math.max(
+                        0,
+                        aliasList.size() - visible
+                );
+
+                aliasScroll = Math.clamp(
+                        aliasScroll
+                                + (verticalAmount > 0 ? -1 : 1),
+                        0,
+                        maxScroll
+                );
+            }
+
+            return true;
+        }
+
         layout();
 
         if (!insidePanel(mouseX, mouseY)) {
             return false;
         }
 
-        scroll += verticalAmount > 0
+        scrollTarget += verticalAmount > 0
                 ? -ROW_H
                 : ROW_H;
 
@@ -872,15 +1298,23 @@ public final class PlayerActionOverlay {
                 Lang.t(Key.TOAST_COPIED, player.name())
         );
 
-        close();
+        requestClose(0);
     }
 
     private void handleRow(RowItem item) {
 
+        // second click on a confirming row — proceed to execution
         if (confirmItem == item) {
 
-            execute(item);
-            close();
+            confirmItem = null;
+            confirmAt = 0L;
+
+            if (execute(item)) {
+                return;
+            }
+
+            // short flash on the row, then animated close
+            requestClose(300);
 
             return;
         }
@@ -895,11 +1329,56 @@ public final class PlayerActionOverlay {
             return;
         }
 
-        execute(item);
-        close();
+        // deferred: alias modal is open — nothing sent yet,
+        // the popup stays alive underneath
+        if (execute(item)) {
+            return;
+        }
+
+        requestClose(300);
     }
 
-    private void execute(RowItem item) {
+    /**
+     * Executes the row action. Returns true when execution was DEFERRED
+     * (the alias picker modal opened and the flow continues there);
+     * false means everything already finished.
+     */
+    private boolean execute(RowItem item) {
+
+        if (item.macro != null &&
+                MacroExecutor.requiresAlias(item.macro)) {
+
+            List<String> aliases =
+                    item.macro.getAliases();
+
+            if (aliases.isEmpty()) {
+
+                MacroExecutor.executeWithAlias(
+                        item.macro,
+                        player,
+                        ""
+                );
+
+                flashItem = item;
+                flashTime = System.currentTimeMillis();
+
+                Toasts.INSTANCE.success(
+                        Lang.t(Key.TOAST_EXECUTED,
+                                item.label)
+                );
+
+                return false;
+            }
+
+            aliasMacro = item.macro;
+            aliasTarget = player;
+            aliasList = new ArrayList<>(aliases);
+            aliasScroll = 0;
+            aliasOpenTime = System.currentTimeMillis();
+            aliasOpen = true;
+
+            return true;
+        }
 
         if (item.macro != null) {
 
@@ -916,9 +1395,14 @@ public final class PlayerActionOverlay {
             );
         }
 
+        flashItem = item;
+        flashTime = System.currentTimeMillis();
+
         Toasts.INSTANCE.success(
                 Lang.t(Key.TOAST_EXECUTED, item.label)
         );
+
+        return false;
     }
 
     private static final class RowItem {

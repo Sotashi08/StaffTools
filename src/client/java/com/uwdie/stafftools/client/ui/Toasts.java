@@ -150,6 +150,25 @@ public final class Toasts {
                     Ui.argb(t.accent(), a)
             );
 
+            // lifetime progress line along the bottom
+            float life = Ui.clamp01(
+                    1f - age / (float)
+                            (IN_MS + HOLD_MS + OUT_MS)
+            );
+
+            int barW = (int) ((w - 6) * life);
+
+            if (barW > 0) {
+
+                context.fill(
+                        x + 3,
+                        y + H - 2,
+                        x + 3 + barW,
+                        y + H - 1,
+                        Ui.argb(t.accent(), a * 0.8f)
+                );
+            }
+
             context.drawTextWithShadow(
                     tr,
                     Text.literal(text),

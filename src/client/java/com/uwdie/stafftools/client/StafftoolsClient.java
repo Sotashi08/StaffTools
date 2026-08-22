@@ -31,6 +31,10 @@ public class StafftoolsClient implements ClientModInitializer {
                 configManager.getConfig().getLanguage()
         );
 
+        com.uwdie.stafftools.client.ui.Theme.apply(
+                configManager.getConfig().getThemeIndex()
+        );
+
         PunishmentHistory.init(
                 FabricLoader.getInstance()
                         .getConfigDir()

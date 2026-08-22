@@ -14,6 +14,9 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ActionEntryEditScreen extends StScreen {
 
     private final Screen parent;
@@ -33,6 +36,21 @@ public class ActionEntryEditScreen extends StScreen {
     private final EmojiPicker emojiPicker =
             new EmojiPicker();
 
+    // aliases side panel
+    private final List<String> workingAliases =
+            new ArrayList<>();
+
+    private int aliasScroll;
+    private int aliasPanelX;
+    private int aliasPanelW = 140;
+    private int aliasListTop = 84;
+    private int aliasListVisible;
+    private StTextField aliasField;
+
+    // placeholder info panel (right side)
+    private static final int INFO_W = 160;
+    private int infoPanelX;
+
     private int left;
     private int inner;
     private int panelBottom;
@@ -44,6 +62,18 @@ public class ActionEntryEditScreen extends StScreen {
     private int labelY;
     private int cmdY;
     private int chipsY;
+
+    private record Chip(
+            int x,
+            int y,
+            int w,
+            String tag,
+            String tooltip
+    ) {
+    }
+
+    private final List<Chip> chips =
+            new ArrayList<>();
 
     public ActionEntryEditScreen(
             Screen parent,
@@ -151,10 +181,23 @@ public class ActionEntryEditScreen extends StScreen {
             String tag =
                     "<" + placeholder.name() + ">";
 
+            int bx = left + col * step;
+            int by = chipsY + row * 24;
+
+            chips.add(
+                    new Chip(
+                            bx,
+                            by,
+                            chipW,
+                            tag,
+                            Lang.t(placeholder.description())
+                    )
+            );
+
             addDrawableChild(
                     new StButton(
-                            left + col * step,
-                            chipsY + row * 24,
+                            bx,
+                            by,
                             chipW,
                             20,
                             Text.literal(tag),
@@ -200,6 +243,60 @@ public class ActionEntryEditScreen extends StScreen {
         int buttonsY = toggleY + 34;
 
         panelBottom = buttonsY + 34;
+
+        // aliases side panel
+        workingAliases.addAll(
+                editing != null
+                        ? editing.getAliases()
+                        : List.of()
+        );
+
+        aliasPanelX = Math.max(
+                4,
+                panelX - 10 - aliasPanelW
+        );
+
+        infoPanelX = Math.min(
+                width - INFO_W - 4,
+                panelX + panelW + 10
+        );
+
+        aliasField = new StTextField(
+                textRenderer,
+                aliasPanelX + 6,
+                56,
+                aliasPanelW - 32,
+                20,
+                Text.empty(),
+                nextSlot()
+        );
+
+        aliasField.setOnFocusGain(
+                () -> lastFocused = aliasField
+        );
+
+        addDrawableChild(aliasField);
+
+        addDrawableChild(
+                new StButton(
+                        aliasPanelX + aliasPanelW - 24,
+                        56,
+                        18,
+                        20,
+                        Text.literal("+"),
+                        b -> {
+                            String text =
+                                    aliasField.getText().trim();
+
+                            if (!text.isEmpty()) {
+                                workingAliases.add(text);
+                                aliasField.setText("");
+                            }
+                        },
+                        nextSlot(),
+                        Ui.ACCENT
+                )
+        );
 
         button(
                 left,
@@ -302,6 +399,10 @@ public class ActionEntryEditScreen extends StScreen {
         target.setDangerous(confirm);
         target.setConfirmationRequired(confirm);
 
+        target.setAliases(
+                new ArrayList<>(workingAliases)
+        );
+
         if (isNew) {
 
             StafftoolsClient.getConfig()
@@ -311,7 +412,11 @@ public class ActionEntryEditScreen extends StScreen {
 
         StafftoolsClient.saveConfig();
 
-        client.setScreen(parent);
+        client.setScreen(
+                parent instanceof StafftoolsScreen
+                        ? new StafftoolsScreen()
+                        : parent
+        );
     }
 
     @Override
@@ -325,7 +430,73 @@ public class ActionEntryEditScreen extends StScreen {
             return true;
         }
 
+        if (button == 0 &&
+                isInsideAliasList(mouseX, mouseY)) {
+
+            int index = aliasScroll + (int)
+                    ((mouseY - aliasListTop) / 16);
+
+            if (index >= 0 &&
+                    index < workingAliases.size()) {
+
+                int rx = (int) mouseX;
+
+                if (rx >= aliasPanelX + aliasPanelW - 22 &&
+                        rx <= aliasPanelX + aliasPanelW - 6) {
+
+                    workingAliases.remove(index);
+                }
+            }
+
+            return true;
+        }
+
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(
+            double mouseX,
+            double mouseY,
+            double horizontalAmount,
+            double verticalAmount
+    ) {
+
+        if (isInsideAliasList(mouseX, mouseY)) {
+
+            int maxScroll = Math.max(
+                    0,
+                    workingAliases.size() - aliasListVisible
+            );
+
+            aliasScroll = Math.clamp(
+                    aliasScroll
+                            + (verticalAmount > 0 ? -1 : 1),
+                    0,
+                    maxScroll
+            );
+
+            return true;
+        }
+
+        return super.mouseScrolled(
+                mouseX,
+                mouseY,
+                horizontalAmount,
+                verticalAmount
+        );
+    }
+
+    private boolean isInsideAliasList(
+            double mouseX,
+            double mouseY
+    ) {
+
+        return mouseX >= aliasPanelX &&
+                mouseX <= aliasPanelX + aliasPanelW &&
+                mouseY >= aliasListTop &&
+                mouseY < aliasListTop
+                        + aliasListVisible * 16;
     }
 
     @Override
@@ -392,6 +563,268 @@ public class ActionEntryEditScreen extends StScreen {
                 chipsY - 12,
                 Ui.argb(Ui.TEXT_DIM, alpha)
         );
+
+        // aliases side panel (height capped to its content)
+        int aliasPanelBottom = Math.min(
+                panelBottom - 6,
+                aliasListTop + 8 * 16 + 12
+        );
+
+        Ui.drawPanel(
+                context,
+                aliasPanelX,
+                34,
+                aliasPanelW,
+                aliasPanelBottom - 34,
+                alpha
+        );
+
+        context.drawCenteredTextWithShadow(
+                textRenderer,
+                Lang.text(Key.LABEL_ALIASES),
+                aliasPanelX + aliasPanelW / 2,
+                40,
+                Ui.argb(Ui.TEXT_DIM, alpha)
+        );
+
+        int maxVisible = Math.max(
+                0,
+                (aliasPanelBottom - 12 - aliasListTop) / 16
+        );
+
+        aliasListVisible = Math.min(
+                workingAliases.size(),
+                maxVisible
+        );
+
+        for (int i = 0; i < aliasListVisible; i++) {
+
+            String alias =
+                    workingAliases.get(aliasScroll + i);
+
+            int ry = aliasListTop + i * 16;
+
+            context.fill(
+                    aliasPanelX + 4,
+                    ry,
+                    aliasPanelX + aliasPanelW - 4,
+                    ry + 14,
+                    Ui.argb(Ui.PANEL_BG_SOFT, alpha)
+            );
+
+            String shown = textRenderer.trimToWidth(
+                    alias,
+                    aliasPanelW - 32
+            );
+
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(shown),
+                    aliasPanelX + 7,
+                    ry + 3,
+                    Ui.argb(Ui.TEXT, alpha)
+            );
+
+            boolean xHovered =
+                    mouseX >= aliasPanelX + aliasPanelW - 22 &&
+                            mouseX <= aliasPanelX + aliasPanelW - 6 &&
+                            mouseY >= ry &&
+                            mouseY < ry + 14;
+
+            if (xHovered) {
+
+                context.fill(
+                        aliasPanelX + aliasPanelW - 22,
+                        ry,
+                        aliasPanelX + aliasPanelW - 6,
+                        ry + 14,
+                        Ui.argb(0xFF8A2B2B, alpha)
+                );
+            }
+
+            context.drawCenteredTextWithShadow(
+                    textRenderer,
+                    Text.literal("✕"),
+                    aliasPanelX + aliasPanelW - 14,
+                    ry + 2,
+                    Ui.argb(
+                            xHovered ? 0xFFFFFFFF : Ui.DANGER_SOFT,
+                            alpha
+                    )
+            );
+        }
+
+        // placeholder info panel (right side), shown on chip hover
+        Chip hoveredChip = getHoveredChip(mouseX, mouseY);
+
+        if (hoveredChip != null) {
+            drawInfoPanel(
+                    context,
+                    hoveredChip,
+                    alpha
+            );
+        }
+    }
+
+    private Chip getHoveredChip(
+            double mouseX,
+            double mouseY
+    ) {
+
+        for (Chip chip : chips) {
+
+            if (mouseX >= chip.x() &&
+                    mouseX < chip.x() + chip.w() &&
+                    mouseY >= chip.y() &&
+                    mouseY < chip.y() + 20) {
+
+                return chip;
+            }
+        }
+
+        return null;
+    }
+
+    private void drawInfoPanel(
+            DrawContext context,
+            Chip chip,
+            float alpha
+    ) {
+
+        int top = 34;
+        int bottom = Math.max(
+                top + 60,
+                panelBottom
+        );
+
+        Ui.drawPanel(
+                context,
+                infoPanelX,
+                top,
+                INFO_W,
+                bottom - top,
+                alpha
+        );
+
+        // accent header strip
+        Ui.drawGradientH(
+                context,
+                infoPanelX + 3,
+                top + 1,
+                INFO_W - 6,
+                2,
+                Ui.ACCENT,
+                Ui.ACCENT_2,
+                alpha
+        );
+
+        context.drawTextWithShadow(
+                textRenderer,
+                Text.literal(chip.tag()),
+                infoPanelX + 8,
+                top + 12,
+                Ui.argb(Ui.ACCENT_SOFT, alpha)
+        );
+
+        int maxLines =
+                (bottom - top - 34) / 11;
+
+        List<String> lines = wrapAll(
+                textRenderer,
+                chip.tooltip(),
+                INFO_W - 16,
+                maxLines
+        );
+
+        int y = top + 30;
+
+        for (String line : lines) {
+
+            if (line.isEmpty()) {
+
+                y += 6;
+                continue;
+            }
+
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(line),
+                    infoPanelX + 8,
+                    y,
+                    Ui.argb(Ui.TEXT_DIM, alpha)
+            );
+
+            y += 11;
+        }
+    }
+
+    /** Word wrap without a line cap (panel handles overflow). */
+    private static List<String> wrapAll(
+            net.minecraft.client.font.TextRenderer tr,
+            String text,
+            int maxWidth,
+            int maxLines
+    ) {
+
+        List<String> out = new ArrayList<>();
+
+        for (String para : text.split("\n")) {
+
+            if (para.isEmpty()) {
+
+                out.add("");
+                continue;
+            }
+
+            StringBuilder current = new StringBuilder();
+
+            for (String word : para.split(" ")) {
+
+                String candidate =
+                        current.length() == 0
+                                ? word
+                                : current + " " + word;
+
+                if (tr.getWidth(candidate) <= maxWidth) {
+                    current = new StringBuilder(candidate);
+                    continue;
+                }
+
+                if (current.length() > 0) {
+                    out.add(current.toString());
+                    current = new StringBuilder();
+                }
+
+                while (tr.getWidth(word) > maxWidth
+                        && word.length() > 1) {
+
+                    word = word.substring(
+                            0,
+                            word.length() - 1
+                    );
+                }
+
+                current = new StringBuilder(word);
+            }
+
+            if (current.length() > 0) {
+                out.add(current.toString());
+            }
+        }
+
+        if (out.size() > maxLines) {
+
+            out = new ArrayList<>(
+                    out.subList(0, maxLines)
+            );
+
+            out.set(
+                    out.size() - 1,
+                    out.get(out.size() - 1) + "..."
+            );
+        }
+
+        return out;
     }
 
     @Override

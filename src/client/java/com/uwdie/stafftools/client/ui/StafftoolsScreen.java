@@ -91,6 +91,21 @@ public class StafftoolsScreen extends StScreen {
 
         panelBottom =
                 contentTop + (row + 1) * ROW_STEP + 6 + WIDGET_H + 10;
+
+        // themes picker — bottom-right corner of the SCREEN
+        addDrawableChild(
+                new StButton(
+                        width - 96,
+                        height - 28,
+                        88,
+                        20,
+                        Text.literal("🎨 ")
+                                .append(Lang.text(Key.BTN_THEMES)),
+                        b -> client.setScreen(new ThemesScreen()),
+                        nextSlot(),
+                        Ui.ACCENT
+                )
+        );
     }
 
     private void addNavButton(

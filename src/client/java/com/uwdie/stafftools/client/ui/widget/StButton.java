@@ -18,6 +18,7 @@ public class StButton extends ButtonWidget {
     private final TextRenderer textRenderer =
             MinecraftClient.getInstance().textRenderer;
     private float hoverAmt;
+    private boolean hoverSoundPlayed;
 
     public StButton(
             int x,
@@ -56,6 +57,13 @@ public class StButton extends ButtonWidget {
         }
 
         float target = isHovered() ? 1f : 0f;
+
+        if (target > 0f && !hoverSoundPlayed && active) {
+            Ui.playHover();
+            hoverSoundPlayed = true;
+        } else if (target <= 0f) {
+            hoverSoundPlayed = false;
+        }
 
         hoverAmt += (target - hoverAmt) *
                 Math.min(1f, delta * 13f);

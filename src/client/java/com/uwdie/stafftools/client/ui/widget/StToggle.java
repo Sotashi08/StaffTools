@@ -29,6 +29,7 @@ public class StToggle extends ButtonWidget {
             MinecraftClient.getInstance().textRenderer;
     private boolean value;
     private float hoverAmt;
+    private boolean hoverSoundPlayed;
 
     public StToggle(
             int x,
@@ -100,6 +101,13 @@ public class StToggle extends ButtonWidget {
         }
 
         float hoverTarget = isHovered() ? 1f : 0f;
+
+        if (hoverTarget > 0f && !hoverSoundPlayed && active) {
+            Ui.playHover();
+            hoverSoundPlayed = true;
+        } else if (hoverTarget <= 0f) {
+            hoverSoundPlayed = false;
+        }
 
         hoverAmt += (hoverTarget - hoverAmt) *
                 Math.min(1f, delta * 13f);

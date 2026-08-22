@@ -15,6 +15,8 @@ public class StaffToolsConfig {
 
     private boolean toastsEnabled = true;
 
+    private int themeIndex = 0;
+
     private Lang.Language language = Lang.Language.RU;
 
     private List<Macro> macros = new ArrayList<>();
@@ -63,6 +65,15 @@ public class StaffToolsConfig {
 
     public void setToastsEnabled(boolean enabled) {
         this.toastsEnabled = enabled;
+    }
+
+    public int getThemeIndex() {
+
+        return themeIndex < 0 ? 0 : themeIndex;
+    }
+
+    public void setThemeIndex(int index) {
+        this.themeIndex = Math.max(0, index);
     }
 
     public Lang.Language getLanguage() {

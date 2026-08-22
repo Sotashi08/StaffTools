@@ -70,15 +70,6 @@ public class MacroContext {
                     "z",
                     Integer.toString(blockPos.getZ())
             );
-
-            variables.put(
-                    "health",
-                    Integer.toString(
-                            (int) Math.ceil(
-                                    client.player.getHealth()
-                            )
-                    )
-            );
         }
 
         if (client.getCurrentServerEntry() != null) {

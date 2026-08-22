@@ -1,5 +1,7 @@
 package com.uwdie.stafftools.client.macro;
 
+import com.uwdie.stafftools.client.i18n.Lang;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -14,56 +16,49 @@ public final class PlaceholderRegistry {
 
         register(
                 "player",
-                "Target player name",
+                Lang.Key.PH_PLAYER,
                 context ->
                         context.get("player")
         );
 
         register(
                 "staff",
-                "Your player name",
+                Lang.Key.PH_STAFF,
                 context ->
                         context.get("staff")
         );
 
         register(
                 "x",
-                "Your X coordinate",
+                Lang.Key.PH_X,
                 context ->
                         context.get("x")
         );
 
         register(
                 "y",
-                "Your Y coordinate",
+                Lang.Key.PH_Y,
                 context ->
                         context.get("y")
         );
 
         register(
                 "z",
-                "Your Z coordinate",
+                Lang.Key.PH_Z,
                 context ->
                         context.get("z")
         );
 
         register(
                 "ping",
-                "Target player latency (ms)",
+                Lang.Key.PH_PING,
                 context ->
                         context.get("ping")
         );
 
         register(
-                "health",
-                "Your health (hearts x2)",
-                context ->
-                        context.get("health")
-        );
-
-        register(
                 "server",
-                "Current server address",
+                Lang.Key.PH_SERVER,
                 context ->
                         context.get("server")
         );

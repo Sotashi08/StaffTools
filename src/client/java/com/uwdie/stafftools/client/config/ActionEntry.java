@@ -13,6 +13,9 @@ public class ActionEntry {
     private boolean dangerous;
     private boolean confirmationRequired;
 
+    private List<String> aliases =
+            new ArrayList<>();
+
     public ActionEntry() {
         this.icon = "";
         this.label = "New action";
@@ -128,5 +131,19 @@ public class ActionEntry {
 
     public void setConfirmationRequired(boolean confirmationRequired) {
         this.confirmationRequired = confirmationRequired;
+    }
+
+    public List<String> getAliases() {
+        return aliases != null
+                ? List.copyOf(aliases)
+                : List.of();
+    }
+
+    public void setAliases(List<String> aliases) {
+
+        this.aliases =
+                aliases != null
+                        ? new ArrayList<>(aliases)
+                        : new ArrayList<>();
     }
 }
