@@ -13,9 +13,11 @@ import net.minecraft.text.TextContent;
 import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.util.Formatting;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,14 +68,23 @@ public final class ChatTextProcessor {
 
         if (matcher.find()) {
 
+            String name = matcher.group(1);
+
+            // online player first...
             PlayerContext resolved =
-                    PlayerResolver.resolve(
-                            matcher.group(1)
-                    ).orElse(null);
+                    PlayerResolver.resolve(name)
+                            .orElse(null);
 
             if (resolved != null) {
                 return resolved;
             }
+
+            // ...otherwise keep the raw nick from the command:
+            // the target may be offline, but actions must still open
+            return new PlayerContext(
+                    name,
+                    offlineUuid(name)
+            );
         }
 
         List<PlayerMention> inValue =
@@ -82,6 +93,17 @@ public final class ChatTextProcessor {
         return inValue.isEmpty()
                 ? null
                 : inValue.get(0).player();
+    }
+
+    /**
+     * Deterministic UUID for a nick that is not in the tab list
+     * (offline-style: derived from the name itself).
+     */
+    private static UUID offlineUuid(String name) {
+        return UUID.nameUUIDFromBytes(
+                ("OfflinePlayer:" + name)
+                        .getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private static Text processNode(Text node) {

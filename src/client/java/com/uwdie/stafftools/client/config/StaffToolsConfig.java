@@ -17,6 +17,8 @@ public class StaffToolsConfig {
 
     private int themeIndex = 0;
 
+    private boolean chatInputDetectEnabled = true;
+
     private Lang.Language language = Lang.Language.RU;
 
     private List<Macro> macros = new ArrayList<>();
@@ -74,6 +76,14 @@ public class StaffToolsConfig {
 
     public void setThemeIndex(int index) {
         this.themeIndex = Math.max(0, index);
+    }
+
+    public boolean isChatInputDetectEnabled() {
+        return chatInputDetectEnabled;
+    }
+
+    public void setChatInputDetectEnabled(boolean enabled) {
+        this.chatInputDetectEnabled = enabled;
     }
 
     public Lang.Language getLanguage() {

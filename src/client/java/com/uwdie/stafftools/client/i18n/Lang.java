@@ -78,6 +78,7 @@ public final class Lang {
         public static final String TOGGLE_CONFIRMATION = "toggle.confirmation";
         public static final String TOGGLE_LANGUAGE = "toggle.language";
         public static final String TOGGLE_TOASTS = "toggle.toasts";
+        public static final String TOGGLE_CHAT_INPUT = "toggle.chatInput";
 
         // Field labels
         public static final String LABEL_NAME = "label.name";
@@ -198,6 +199,7 @@ public final class Lang {
         ru.put(Key.TOGGLE_CONFIRMATION, "Подтверждать");
         ru.put(Key.TOGGLE_LANGUAGE, "Язык");
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
+        ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
 
         ru.put(Key.LABEL_NAME, "Название");
         ru.put(Key.LABEL_DESCRIPTION, "Описание");
@@ -230,7 +232,7 @@ public final class Lang {
         ru.put(Key.OVERLAY_ALIAS_TITLE, "Выберите пункт");
 
         ru.put(Key.MSG_ALIAS_HELP, String.join("\n",
-                "<alias> — подстановка выбранного пункта наказания.",
+                "<alias> — список возможных вариантов одного и того же действия.",
                 "",
                 "Пример:",
                 "Команда: /mute <player> <alias>",
@@ -238,8 +240,7 @@ public final class Lang {
                 "Результат: /mute Notch 30m Капс",
                 "",
                 "Алиас — просто текст: время и причина пишутся в нём.",
-                "Если список пуст — <alias> заменится пустотой.",
-                "(Shift — эта справка)"));
+                "Если список пуст — <alias> заменится пустотой."));
 
         ru.put(Key.PH_PLAYER, "Ник игрока-цели.\nПример: /mute <player> 10m → /mute Notch 10m");
         ru.put(Key.PH_STAFF, "Ваш текущий ник.\nПример: /warn <player> проверял <staff>");
@@ -312,6 +313,7 @@ public final class Lang {
         en.put(Key.TOGGLE_CONFIRMATION, "Confirm");
         en.put(Key.TOGGLE_LANGUAGE, "Language");
         en.put(Key.TOGGLE_TOASTS, "Notifications");
+        en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
 
         en.put(Key.LABEL_NAME, "Name");
         en.put(Key.LABEL_DESCRIPTION, "Description");
@@ -352,8 +354,7 @@ public final class Lang {
                 "Result: /mute Notch 30m Caps",
                 "",
                 "An alias is plain text: put duration and reason in it.",
-                "If the list is empty — <alias> becomes empty.",
-                "(Shift — this help)"));
+                "If the list is empty — <alias> becomes empty."));
 
         en.put(Key.PH_PLAYER, "Target player's name.\nExample: /mute <player> 10m → /mute Notch 10m");
         en.put(Key.PH_STAFF, "Your current nick.\nExample: /warn <player> checked by <staff>");

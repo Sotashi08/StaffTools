@@ -80,6 +80,13 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
+        addToggle(row++, Key.TOGGLE_CHAT_INPUT,
+                config.isChatInputDetectEnabled(),
+                v -> {
+                    config.setChatInputDetectEnabled(v);
+                    StafftoolsClient.saveConfig();
+                });
+
         button(
                 colX,
                 contentTop + row * ROW_STEP + 6,

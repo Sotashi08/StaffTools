@@ -1,11 +1,12 @@
 # StaffTools — Документация проекта
 
 **StaffTools** — клиентский мод для Minecraft (Fabric, 1.21.1), набор утилит для модерации:
-макросы с плейсхолдерами, попап действий над игроками в чате, умная детекция ников,
-история наказаний и toast-уведомления. Локализация RU/EN.
+макросы с плейсхолдерами и алиасами, попап действий над игроками в чате, умная детекция ников
+(включая поле ввода чата), история наказаний, toast-уведомления и темы оформления.
+Локализация RU/EN.
 
 - **Mod ID:** `stafftools`
-- **Версия:** `1.0-SNAP`
+- **Версия:** `1.1.1`
 - **Автор:** uwdie
 - **Minecraft:** 1.21.1 (Yarn mappings)
 - **Fabric Loader:** ≥ 0.19.3, Fabric API
@@ -28,22 +29,22 @@ com.uwdie.stafftools
     │   └── PlayerMention       — record: упоминание (игрок + позиция)
     ├── config                  — конфигурация
     │   ├── ConfigManager       — загрузка/сохранение JSON
-    │   ├── StaffToolsConfig    — модель конфига (+ toastsEnabled)
-    │   └── ActionEntry         — пункт попапа действий
+    │   ├── StaffToolsConfig    — модель конфига (+ themeIndex, chatInputDetectEnabled)
+    │   └── ActionEntry         — пункт попапа действий (+ aliases)
     ├── i18n
-    │   └── Lang                — локализация RU/EN + ключи строк
+    │   └── Lang                — локализация RU/EN + ключи строк (вкл. ph.* подсказки)
     ├── macro                   — система макросов
-    │   ├── Macro               — модель макроса
+    │   ├── Macro               — модель макроса (+ aliases)
     │   ├── MacroManager        — CRUD макросов
-    │   ├── MacroExecutor       — исполнение команд
+    │   ├── MacroExecutor       — исполнение команд (+ requiresAlias / executeWithAlias)
     │   ├── MacroContext        — контекст переменных для плейсхолдеров
     │   ├── Placeholder         — record: плейсхолдер
-    │   ├── PlaceholderRegistry — реестр плейсхолдеров
+    │   ├── PlaceholderRegistry — реестр плейсхолдеров (описания = ключи Lang ph.*)
     │   └── PlaceholderEngine   — подстановка <placeholder>
     ├── mixin                   — интеграция с Minecraft
     │   ├── ChatHudMixin
     │   ├── ScreenMixin
-    │   ├── ChatScreenMixin
+    │   ├── ChatScreenMixin     — + клик-детект ника из поля ввода
     │   ├── ParentElementMixin
     │   ├── ClientPlayNetworkHandlerMixin
     │   └── InGameHudMixin      — рендер тостов на HUD
@@ -57,32 +58,35 @@ com.uwdie.stafftools
     │   ├── PunishmentStatus    — enum статусов
     │   └── CommandAnalyzer     — разбор команды → тип наказания + extractIssuer
     └── ui                      — интерфейс
-        ├── Ui                  — цвета, анимации, примитивы рисования
-        ├── StScreen            — базовый экран с анимацией входа
+        ├── Ui                  — живая палитра (меняется темами), градиенты, звук ховера
+        ├── Theme               — пресеты палитр (7 штук, вкл. градиентные) → apply() в Ui
+        ├── StScreen            — базовый экран (статичный фон, анимация входа)
         ├── StafftoolsScreen    — главное меню (анимированный логотип, 4 варианта)
-        ├── Toasts              — toast-уведомления (singleton)
-        ├── MacroListScreen     — список макросов
-        ├── MacroEditorScreen   — редактор макроса
+        ├── ThemesScreen        — сетка карточек выбора темы
+        ├── Toasts              — toast-уведомления с прогрессом времени (singleton)
+        ├── MacroListScreen     — список макросов (описание с переносом строк)
+        ├── MacroEditorScreen   — редактор макроса (+ панель алиасов слева)
         ├── ActionsConfigScreen — настройка действий игрока
-        ├── ActionEntryEditScreen — редактор действия
+        ├── ActionEntryEditScreen — редактор действия (+ панель алиасов слева)
         ├── ActionHistoryScreen — история наказаний
-        ├── PlayerActionOverlay — попап действий в чате (singleton)
+        ├── PlayerActionOverlay — попап действий в чате (singleton, модалка алиасов)
         ├── EmojiPicker         — выбор эмодзи
         └── widget
-            ├── StButton        — стилизованная кнопка
-            ├── StToggle        — кнопка-переключатель с цветовым индикатором
-            └── StTextField     — поле ввода
+            ├── StButton        — стилизованная кнопка (+ hover-звук)
+            ├── StToggle        — кнопка-переключатель с цветовым индикатором (+ hover-звук)
+            └── StTextField     — поле ввода (центрированный текст, setOnFocusGain)
 ```
 
 ### Поток данных (как всё связано)
 
-1. **Чат**: `ChatHudMixin` перехватывает каждое сообщение → `ChatTextProcessor` детектит ники (6+ слоёв) и делает их кликабельными; параллельно `PunishmentHistory.onMessageReceived()` ищет ответы сервера на отправленные наказания.
+1. **Чат**: `ChatHudMixin` перехватывает каждое сообщение → `ChatTextProcessor` детектит ники (многослойно) и делает их кликабельными; параллельно `PunishmentHistory.onMessageReceived()` ищет ответы сервера на отправленные наказания.
 2. **Клик по имени**: `ScreenMixin` перехватывает `handleTextClick`:
    - свой префикс `stafftools:player:` → Shift+клик копирует имя, обычный клик открывает `PlayerActionOverlay`;
    - чужой click-event (`/msg <ник>` и т.п.) → резолвится игрок и тоже открывается попап (вместо вставки команды в поле ввода).
-3. **Попап**: показывает настроенные действия (`ActionEntry`) и включённые макросы; при выборе `MacroExecutor` подставляет плейсхолдеры через `PlaceholderEngine`, отправляет команды и показывает toast.
-4. **Команды**: `ClientPlayNetworkHandlerMixin` ловит каждую отправленную команду → `CommandAnalyzer` определяет наказание → запись в `PunishmentHistory`.
-5. **UI**: хоткей Right Shift (`StafftoolsClient`) открывает `StafftoolsScreen`; `Toasts` рендерится на экранах (`ScreenMixin`/`ChatScreenMixin`) и на HUD (`InGameHudMixin`).
+3. **Поле ввода чата**: `ChatScreenMixin` при клике по тексту, который вы пишете вручную, распознаёт ник онлайн-игрока (точное или однозначное частичное совпадение) и открывает попап действий.
+4. **Попап**: показывает настроенные действия (`ActionEntry`) и включённые макросы; для макросов с `<alias>` открывается модалка выбора пункта; `MacroExecutor` подставляет плейсхолдеры через `PlaceholderEngine`, отправляет команды, подсвечивает строку и показывает toast.
+5. **Команды**: `ClientPlayNetworkHandlerMixin` ловит каждую отправленную команду → `CommandAnalyzer` определяет наказание → запись в `PunishmentHistory`.
+6. **UI**: хоткей Right Shift открывает `StafftoolsScreen`; `Toasts` рендерится на экранах и на HUD (`InGameHudMixin`); тема применяется из конфига на старте и меняется мгновенно через `ThemesScreen`.
 
 ---
 
@@ -90,13 +94,13 @@ com.uwdie.stafftools
 
 ### 1.1 `Stafftools` (main entrypoint)
 
-Точка входа мода на общей стороне. Пустой — вся логика клиентская. Константа `MOD_ID = "stafftools"`.
+Пустой — вся логика клиентская. Константа `MOD_ID = "stafftools"`.
 
 ### 1.2 `StafftoolsClient` (client entrypoint)
 
 | Метод / поле | Описание |
 |---|---|
-| `onInitializeClient()` | Создаёт `ConfigManager`; выставляет язык; инициализирует `PunishmentHistory`; создаёт `MacroManager` (+ дефолтные макросы); регистрирует хоткей **Right Shift**; в `END_CLIENT_TICK` открывает новый `StafftoolsScreen()`. |
+| `onInitializeClient()` | Конфиг → язык → **`Theme.apply(themeIndex)`** → `PunishmentHistory` → `MacroManager` → хоткей Right Shift → тик-хендлер открытия главного меню. |
 | `getMacroManager()` / `getConfig()` / `saveConfig()` | Глобальный доступ к менеджерам. |
 
 ---
@@ -104,22 +108,23 @@ com.uwdie.stafftools
 ## 2. Пакет `config`
 
 ### 2.1 `ConfigManager`
-Gson (pretty printing), файл `config/stafftools.json`. `load()` / `save()` / `getConfig()`; при ошибке загрузки — откат к дефолту.
+Gson (pretty printing), файл `config/stafftools.json`. `load()/save()/getConfig()`; при ошибке — откат к дефолту.
 
 ### 2.2 `StaffToolsConfig`
-Поля: `chatMentionsEnabled`, `clickToCopyEnabled`, `playerActionsEnabled`, `dangerousMacroConfirmation`, **`toastsEnabled`** (новое), `language` (RU/EN), `macros`, `actionEntries`. Все геттеры null-safe.
+Поля: `chatMentionsEnabled`, `clickToCopyEnabled`, `playerActionsEnabled`, `dangerousMacroConfirmation`, `toastsEnabled`, **`themeIndex`**, **`chatInputDetectEnabled`**, `language`, `macros`, `actionEntries`. Все геттеры null-safe.
+
+⚠️ Тумблеры «Копировать имя» и «Упоминания в чате» убраны из UI — функции работают всегда, поля конфига сохранены для совместимости.
 
 ### 2.3 `ActionEntry`
-Пункт попапа: `icon`, `label`, `command`, `copyName`, `enabled`, `dangerous`, `confirmationRequired`.
-`dangerous` и `confirmationRequired` в UI объединены в один флаг «Подтверждение» (синхронно записываются оба поля). `static defaults()` — Mute/Ban/Warn/Kick/Copy name.
+Пункт попапа: `icon`, `label`, `command`, `copyName`, `enabled`, `dangerous`, `confirmationRequired`, **`aliases`** (список вариантов для `<alias>`).
+`dangerous` + `confirmationRequired` в UI объединены в один флаг «Подтверждение». `static defaults()` — Mute/Ban/Warn/Kick/Copy name.
 
 ---
 
 ## 3. Пакет `i18n`
 
 ### 3.1 `Lang`
-Локализация без JSON: карта `Map<Language, Map<String,String>>` в `static {}`.
-`Language { RU, EN }` с `@SerializedName`; `Key` — константы ключей (app, btn, toggle, label, msg, overlay, hover, history/pun, toast).
+Карта `Map<Language, Map<String,String>>` в `static {}`. Группы ключей: app, btn, toggle (вкл. `toggle.chatInput`), label (`label.aliases`), msg (`msg.aliasHelp` — многострочная справка `<alias>`), overlay (`overlay.aliasTitle`), hover, history/pun, toast, **`ph.*`** — подробные RU/EN описания каждого плейсхолдера (2 строки: назначение + пример).
 Методы: `setLanguage`, `getLanguage`, `t(key[, args])`, `text(key[, args])`.
 
 ---
@@ -127,21 +132,22 @@ Gson (pretty printing), файл `config/stafftools.json`. `load()` / `save()` /
 ## 4. Пакет `macro`
 
 ### 4.1 `Macro`
-`id` (UUID), `name`, `description`, `commands`, `aliases`, `enabled`, `dangerous`, `confirmationRequired`. Списки выдаются как `List.copyOf`.
+`id`, `name`, `description`, `commands`, **`aliases`** (варианты для `<alias>`), `enabled`, `dangerous`, `confirmationRequired`.
 
 ### 4.2 `MacroManager`
-`initialize()` создаёт дефолты (Day, Night, Teleport, Mute) при пустом списке; `register` (upsert по id), `remove(UUID)`, `getMacros()`. Любое изменение сразу сохраняется.
+Дефолты при пустом списке; `register` (upsert по id), `remove(UUID)`, `getMacros()`. Изменения сохраняются сразу.
 
 ### 4.3 `MacroExecutor`
-`execute(Macro, target)` / `executeCommands(List<String>, target)`: `MacroContext.create(target)` → на каждую команду `PlaceholderEngine.resolve` → trim → срез `/` → `sendChatCommand`.
+- `execute(Macro, target)` / `executeCommands(List<String>, target)` — базовый путь;
+- **`requiresAlias(Macro)`** — есть ли `<alias>` в командах;
+- **`executeWithAlias(Macro, target, alias)`** — заменяет `<alias>` ДО резолва остальных плейсхолдеров, схлопывает двойные пробелы, пустой алиас допустим.
 
 ### 4.4 `MacroContext`
-Переменные (актуальный набор): `player`, `staff`, **`x`, `y`, `z`** (блочные координаты игрока), **`ping`** (латентность цели из tab-list), **`health`** (HP игрока), **`server`** (адрес текущего сервера). Устаревшие `uuid/world/time/day` удалены.
-`resolvePing(client, target)` (private static) ищет цель в player list.
+Переменные: `player`, `staff`, `x`, `y`, `z`, `ping`, `server`. (`health` удалён.)
 
 ### 4.5–4.7 `Placeholder` / `PlaceholderRegistry` / `PlaceholderEngine`
-Реестр (`LinkedHashMap`, порядок = порядок чипов в UI): `<player>`, `<staff>`, `<x>`, `<y>`, `<z>`, `<ping>`, `<health>`, `<server>`.
-`register/get/getAll` публичны. `PlaceholderEngine.resolve` — regex `<([a-zA-Z0-9_]+)>`, неизвестные шаблоны не трогаются, замена через `quoteReplacement`.
+Реестр: `<player>`, `<staff>`, `<x>`, `<y>`, `<z>`, `<ping>`, `<server>` (порядок = порядок чипов). Описания — **ключи Lang `ph.*`** (локализуемые, двухстрочные).
+`<alias>` — не в реестре: это служебный плейсхолдер макросов; чип добавляется в редакторе сразу после `<player>`.
 
 ---
 
@@ -157,8 +163,8 @@ record PlayerContext(String name, UUID uuid)
 |---|---|
 | `resolve(name)` | Точное совпадение (ignore case). |
 | `resolveByUuid(uuid)` | Поиск по UUID. |
-| **`resolveByDisplayName(text)`** | Ищет игрока, чей **display-name из tab-list'а** содержится в тексте (для серверов с кастомными никами). Минимальная длина DN — 3 символа. |
-| `findPlayers(text)` | Все игроки с целым вхождением имени в текст; сортировка по длине убыванию. |
+| `resolveByDisplayName(text)` | Игрок, чей display-name из tab-list'а содержится в тексте. |
+| `findPlayers(text)` | Игроки с целым вхождением имени; сортировка по длине убыванию. |
 
 ---
 
@@ -169,26 +175,14 @@ record PlayerContext(String name, UUID uuid)
 record PlayerMention(PlayerContext player, int start, int end)
 ```
 
-### 6.2 `NickAliases` (новый)
-Обучаемая карта «кастомный ник → игрок» (in-memory, до 500 записей).
-- `learn(visibleText, player)` — запоминает токены из коротких (≤24 симв.) компонентов, когда реальный игрок известен через другой канал; токены, совпадающие с реальными никами онлайн-игроков, пропускаются;
-- `detect(message)` — находит все вхождения выученных алиасов (границы слова).
+### 6.2 `NickAliases`
+Обучаемая карта «кастомный ник → игрок» (до 500 записей): `learn(visibleText, player)` / `detect(message)`.
 
 ### 6.3 `PlayerMentionDetector`
-Слои детекта:
-1. Прямой матчинг имён tab-list (все вхождения, границы слова);
-2. Матчинг после **очистки §-кодов** (с обратным маппингом индексов для подсветки);
-3. **Алиасы** из `NickAliases`.
+Слои: прямой матчинг → §-очистка (с обратным маппингом индексов) → алиасы `NickAliases`.
 
 ### 6.4 `ChatTextProcessor`
-Ядро подсветки. Порядок разрешения игрока для узла текста:
-1. `resolveFromForeignClick(clickValue)` — команда вида `/msg|tell|whisper|w|m|t <ник>` (regex `COMMAND_PLAYER`) или любой ник tab-list внутри значения;
-2. HoverEvent SHOW_TEXT → детект ника в тексте тултипа → display-name в тултипе;
-3. Обычный текст → §-очистка → алиасы;
-4. Display-name в видимом тексте узла.
-
-При успешном резолве через события/display-name вызывается `NickAliases.learn`, узел копируется и получает `mentionStyle` (жёлтый, ClickEvent `stafftools:player:<name>:<uuid>`, hover-подсказки).
-Ключевые методы: `process`, `processNode`, `resolveFromEvents`, `resolveFromForeignClick` (public — используется ScreenMixin), `buildHighlighted`, `styleName`, `mentionStyle`.
+Многослойный резолв игрока для узла текста: foreign click-event (`/msg <ник>` или любой ник в команде) → hover-текст → hover display-name → видимый текст (§-очистка → алиасы) → display-name в видимом тексте. При резолве через события/display-name вызывается `NickAliases.learn`. Успешный узел получает `mentionStyle` (жёлтый + ClickEvent `stafftools:player:<name>:<uuid>` + hover-подсказки).
 
 ---
 
@@ -198,133 +192,129 @@ record PlayerMention(PlayerContext player, int start, int end)
 `PENDING` / `DONE` / `NO_RESPONSE`.
 
 ### 7.2 `PunishmentType`
-Enum: BAN 🔨, MUTE 🔇, KICK 👢, WARN ⚠, FREEZE 🧊, OTHER ✏. Несёт `commandAliases` и RU/EN `responseKeywords`. Методы: `getLabel`, `getIcon`, `matchesCommand`, `matchesResponse`, `match(head)`.
+BAN 🔨, MUTE 🔇, KICK 👢, WARN ⚠, FREEZE 🧊, OTHER ✏ — алиасы команд + RU/EN ключевые слова ответов.
 
 ### 7.3 `PunishmentRecord`
-`playerName`, `type`, `command`, `timestamp`, `status`, `response`. `RESPONSE_TIMEOUT_MS = 30_000`; `getEffectiveStatus()` возвращает NO_RESPONSE по таймауту.
+`playerName/type/command/timestamp/status/response`; таймаут ответа 30 c → NO_RESPONSE.
 
 ### 7.4 `CommandAnalyzer`
-- `analyze(rawCommand)` — команда → `PunishmentRecord` (тип по первому слову, игрок — первый аргумент без `-`);
-- `isFailure(lowerText)` — признаки ошибки сервера;
-- **`extractIssuer(lowerText)`** — regex `(?:by|от|модератором|администратором|модером|админом)\s+<ник>`: извлекает модератора из broadcast'ов;
-- `normalize(text)`.
+`analyze`, `isFailure`, **`extractIssuer`** (кто выдал наказание — из broadcast'ов), `normalize`.
 
 ### 7.5 `PunishmentHistory`
-Singleton, JSON `config/stafftools_history.json`, максимум 300 записей.
-- `onCommandSent(command)` — фиксация своих наказаний (PENDING);
-- `onMessageReceived(message)` — сопоставление ответов: сообщение должно содержать имя игрока записи И (keyword типа ИЛИ failure). **Фильтр чужих наказаний:** если `extractIssuer` нашёл модератора и это не локальный игрок (`client.player.getName()`), запись НЕ разрешается — чужие баны не съедают ваши PENDING-записи;
-- `getRecords()`, `clear()`, `trim/load/save`.
+Singleton, до 300 записей. `onCommandSent` фиксирует свои наказания; `onMessageReceived` разрешает PENDING только если сообщение содержит имя игрока И (keyword типа ИЛИ failure) И **issuer не другой модератор** (`extractIssuer` + сравнение со своим ником).
 
 ---
 
 ## 8. Пакет `ui`
 
-### 8.1 `Ui`
-Палитра: `ACCENT` #3F8AE0, `ACCENT_SOFT/DARK`, `TEXT`, `TEXT_DIM/MUTED`, `DANGER(_SOFT)`, `SUCCESS`, `WARNING`, `PANEL_BG(_SOFT)`, `PANEL_BORDER`.
-Методы: `argb(color, alpha)`, `clamp01`, `easeOutCubic`, `mix(a,b,t)`, `drawRoundRect`, `drawRoundBorder`, `drawPanel`, `drawHeader`.
-⚠️ Известное ограничение: `drawRoundRect` деградирует при `radius == size/2` (нулевые заливки) — маленькие круги рисовать вручную (см. индикатор StToggle).
+### 8.1 `Ui` — живая палитра
+Цветовые поля **не final**: `Theme.apply(...)` их перезаписывает, все виджеты читают при рендере — смена темы мгновенная. Поля: `ACCENT`, **`ACCENT_2`** (второй цвет градиента), `ACCENT_SOFT/DARK`, `TEXT`, `TEXT_DIM/MUTED`, `DANGER(_SOFT)`, `SUCCESS`, `WARNING`, `PANEL_BG(_SOFT)`, `PANEL_BORDER`.
+Методы: `argb`, `clamp01`, `easeOutCubic`, `mix`, `drawRoundRect`, `drawRoundBorder`, `drawPanel` (нижняя акцентная полоса — градиент при ACCENT_2≠ACCENT), `drawHeader`, **`drawGradientH(x,y,w,h,c1,c2,alpha)`** (полосками), **`playHover()`** (тихий тик BLOCK_NOTE_BLOCK_HAT).
+⚠️ `drawRoundRect` ломается при `radius == size/2` — маленькие круги рисовать вручную.
 
 ### 8.2 `StScreen` (abstract)
-Анимация входа (260 мс, сдвиг снизу + fade); staggered-виджеты (28 мс/слот).
-`openTime` — **не final**: переопределяемые экраны могут сбросить вход.
-Хуки: `renderTheme` / `renderOverlay`. Фабрики: `button(...)`, `toggle(...)`. Хелперы: `drawTitle`, `drawHint`, `formWidth/formLeft` (max 380px).
+- Анимация входа (260 мс, сдвиг снизу + fade); staggered-виджеты (28 мс/слот);
+- **Статичный фон**: переопределён `renderBackground` (public в 1.21!) — свой тёмный градиент без ванильного анимированного блюра; флаг `suppressBackground` глушит повторную отрисовку фона внутри `super.render()`;
+- Хуки `renderTheme/renderOverlay`; фабрики `button/toggle`; хелперы `drawTitle/drawHint/formWidth/formLeft`;
+- ⚠️ Виджеты создавать **только в `init()`** — создание в render-методах накапливает копии каждый кадр.
 
 ### 8.3 Виджеты
 
 #### `StButton`
-Фон `0xFF171B22 → 0xFF23334B` (hover lerp delta*13), рамка `0xFF2C3B55 → accent`, радиус 3, акцентная полоса сверху, staggered появление.
+Фон/рамка как у всей темы, hover lerp, акцентная полоса сверху, staggered появление, hover-звук.
 
 #### `StToggle`
-Выглядит как обычная кнопка (та же рамка/фон/ховер), справа — **круглый цветовой индикатор** вместо ползунка: зелёно-акцентный (вкл) / серый (выкл), рисуется вручную (fill-полосы + угловые пиксели, т.к. drawRoundRect ломается на кругах). Подпись слева.
+Выглядит как обычная кнопка; справа круглый цветовой индикатор (вкл = зелёно-акцентный, выкл = серый), рисуется вручную. Подпись слева. Hover-звук.
 
 #### `StTextField`
-Прозрачный фон, focus-подсветка (`focusAmt` lerp), внутренний сдвиг контента `translate(4, 5)` для центрирования текста в рамке, колбэк `setOnFocusGain(Runnable)` (используется редакторами для вставки эмодзи/плейсхолдеров в последнее активное поле).
+Прозрачный фон, focus-подсветка, контент сдвинут `translate(4, 5)` (центрирование в рамке), колбэк `setOnFocusGain(Runnable)`.
 
 ### 8.4 `StafftoolsScreen` — главное меню
-Одна центрированная колонка 220px: анимированный логотип → тэглайн → разделители с бегущим бликом → 4 кнопки навигации → 3 тумблера (Попап действий / Подтверждение опасных / Уведомления) → Закрыть.
-- **Логотип** — текстовый, 4 случайных варианта при открытии (`logoVariant`): wave / comet (ping-pong пробег) / float / ripple; субпиксельная плавность через матрицы;
-- **Шиммер-линии** — ping-pong сегмент по разделителям, в противофазе; появляются синхронно с прогрессом входа (`alpha`), а не по wall-clock;
-- ⚠️ Все временные циклы используют `% N` в **long**-пространстве (float теряет точность на epoch-таймстампах);
-- Возврат из дочерних экранов — всегда через `new StafftoolsScreen()` (свежая анимация).
+Центрированная колонка 220px: логотип → тэглайн → разделители с бегущим бликом → навигация (Макросы/Создать/Действия/История) → тумблеры (**Попап действий / Подтверждение опасных / Уведомления / Ник из поля ввода**) → Закрыть. Кнопка «🎨 Темы» — правый нижний угол **экрана**.
+- Логотип: 4 случайных варианта (wave/comet/float/ripple), субпиксельно;
+- Шиммер-линии: ping-pong, противофаза, синхронны с прогрессом входа;
+- `% N` — только в long-пространстве.
 
-### 8.5 `MacroListScreen`
-Виртуальный список (rebuild по needsRebuild). Строки: имя, бейдж «⚠ confirm» (объединённый), описание. Кнопки строки: Вкл/Выкл, Изменить, Удалить. «Назад» → `new StafftoolsScreen()`.
+### 8.5 `ThemesScreen extends StScreen`
+Сетка карточек 4×N (карточка ~90×52, адаптивная ширина): градиентный превью-блок (реальные цвета пресета через `drawGradientH`), название, ✓ у активной, рамка-акцент, hover-lift −1px. Клики применяют тему + saveConfig + пересборка экрана. «Назад» внизу по центру. Виджеты создаются только в `init()`.
 
-### 8.6 `MacroEditorScreen extends StScreen`
-Центрированный диалог max 330px (`panelX/panelW`). Сетка от якорей `nameY=50 → descY+38 → cmdY+38`: поля Название/Описание/Команда (текст центрирован в рамках), кнопка 😀, тумблеры `Включено | Подтверждение` (единый флаг → setDangerous+setConfirmationRequired), чипы плейсхолдеров **динамической ширины**, Сохранить/Отмена. `lastFocused` — цель вставки эмодзи/плейсхолдеров.
+### 8.6 `MacroListScreen`
+Виртуальный список; описание с **автопереносом до 2 строк** (word-wrap + обрезка длинных слов + «...»); бейдж «⚠ confirm».
 
-### 8.7 `ActionsConfigScreen`
-Список действий: ▲ ▼ (перестановка), Изменить, Удалить; «Добавить действие»/«Назад» (→ новый главный экран).
+### 8.7 `MacroEditorScreen extends StScreen`
+Три панели: **алиасы слева** (высота ограничена контентом; ввод + «+», список с ✕ и hover-подсветкой, скролл), основной диалог по центру (max 330px), **инфо-панель справа**. Сетка от якорей (nameY=50, шаг 38). Чипы динамической ширины, `<alias>` после `<player>`. Тумблеры `Включено | Подтверждение`.
 
-### 8.8 `ActionEntryEditScreen extends StScreen`
-Как MacroEditorScreen, но поля Иконка(60)/Действие/Команда; тумблеры `Включено | Подтверждение` (copyName из UI убран — поле модели сохраняется как есть). Отмена: если parent — главный экран, создаётся новый экземпляр.
+**Инфо-панель плейсхолдеров**: при ховере чипа справа появляется панель — тег акцентом + полное описание с примерами (перенос по словам). Заменила плавающие тултипы (те накладывались на контент).
 
-### 8.9 `ActionHistoryScreen extends StScreen`
-Таблица Время/Действие/Игрок, зебра, staggered-строки, скролл. Кнопки Назад (→ новый главный экран) и Очистить (danger-accent).
+### 8.8 `ActionsConfigScreen`
+Список действий: ▲ ▼, Изменить, Удалить; «Добавить действие»/«Назад».
 
-### 8.10 `PlayerActionOverlay` (singleton)
-Попап действий над чатом. Ключевые особенности:
-- Закрытие при смене экрана: `ownerScreen` проверяется в `render()` (фикс «зависшего» попапа после отправки сообщения);
-- Строки: зазор `ROW_GAP=4`, текст вертикально центрирован, обводки всех строк (тусклые/акцент при hover/DANGER при подтверждении);
-- **Подтверждение с таймером**: `CONFIRM_MS=3000`, фейд подложки по остатку времени, прогресс-полоска на строке, отсчёт секунд в подсказке; подсказка живёт в расширенной футер-зоне (`FOOTER_H=26`) и не накладывается на строки;
-- **Grip** «⋯» в правом верхнем углу: пульсирующая рамка, hover-подсветка, перетаскивание панели;
-- Шапка: ник игрока + `NP: <total>` — общее число наказаний цели из истории;
-- Тосты на копирование имени и выполнение действия;
-- Анимация scale+fade открытия; закрытие по ESC/клику вне.
+### 8.9 `ActionEntryEditScreen extends StScreen`
+Как MacroEditorScreen (Иконка/Действие/Команда) + **та же панель алиасов слева** (алиасы сохраняются в `ActionEntry`) + инфо-панель справа. copyName из UI убран.
 
-Методы: `open/close/isOpen`, `buildItems`, `layout`, hit-testing (`insidePanel/inGrip/inCopyRow/hitRow`), `render` + `drawCopyRow/drawBody/drawFooter/drawGrip`, ввод (`mouseClicked/Dragged/Released/Scrolled`), `punishmentSummary`, `handleRow`, `execute`, внутренние `RowItem`/`Row`.
+### 8.10 `ActionHistoryScreen extends StScreen`
+Таблица Время/Действие/Игрок, зебра, staggered-строки, скролл.
 
-### 8.11 `Toasts` (singleton, новый)
-Уведомления в правом нижнем углу, стек до 4 штук.
-- Типы: `info/success/warn/danger` (цветная боковая полоса);
-- Анимация: slide-in справа (ease-out, 200 мс) → hold 2.6 с → fade-out с дрейфом;
-- Рендерится везде: экраны (`ScreenMixin`, `ChatScreenMixin`) + HUD (`InGameHudMixin`);
-- `push()` проверяет `config.isToastsEnabled()`;
-- Триггеры: копирование ника, выполнение действия/макроса.
+### 8.11 `PlayerActionOverlay` (singleton)
+Попап действий над чатом:
+- **Жизненный цикл закрытия**: `requestClose(delayMs)` запускает fade+подъём+сжатие (160 мс), затем `finishClose()`; `delayMs=300` даёт время показать вспышку выполненной строки; во время закрытия ввод поглощается;
+- **Плавный скролл**: колесо двигает `scrollTarget`, `scroll` догоняет его (delta*14);
+- **Подтверждение**: двойной клик, 3 c, угасание красной подложки + таймер-полоска на строке (отдельной текстовой подсказки больше нет);
+- **Модалка алиасов**: по центру, без затемнения, акцентная полоса шапки, опции-кнопки с обводками и каскадным выдвижением слева-направо; ESC → отмена; клик вне → отмена; пока открыта — весь ввод уходит в неё;
+- **Grip** «⋯» справа сверху: пульсация, hover, перетаскивание;
+- Шапка: ник + `NP: <всего>` (статичное число из истории);
+- Вспышка SUCCESS на выполненной строке; hover-звук при смене строки;
+- Закрытие при смене экрана (`ownerScreen`).
 
-### 8.12 `EmojiPicker`
-Сетка 40 эмодзи (8×18px), авто-позиционирование, `open(x,y,onPick)/close/mouseClicked/render`.
+### 8.12 `Toasts` (singleton)
+Правый нижний угол, стек до 4. Типы info/success/warn/danger; slide-in → hold (с прогресс-линией времени) → fade-out. Гейтится `config.isToastsEnabled()`.
+
+### 8.13 `EmojiPicker`
+Без изменений: сетка 40 эмодзи, авто-позиционирование.
 
 ---
 
 ## 9. Пакет `mixin`
 
 ### 9.1 `ChatHudMixin`
-| Инъекция | Описание |
-|---|---|
-| `@ModifyVariable stafftools$styleMessage` | Сообщение → `ChatTextProcessor.process`. |
-| `@Inject stafftools$captureMessage` | Текст → `PunishmentHistory.onMessageReceived`. |
+Подсветка сообщений (`@ModifyVariable`) + сопоставление ответов истории (`@Inject`).
 
 ### 9.2 `ScreenMixin`
-| Инъекция | Описание |
-|---|---|
-| `stafftools$onTextClick` (HEAD) | Свой префикс → парс `name:uuid`, резолв (UUID → имя → fallback), Shift+клик = копия, клик = попап. Чужие клики → `resolveFromForeignClick` → попап вместо вставки команды. |
-| `stafftools$renderOverlay` (TAIL) | Попап + `Toasts.render` на любом экране кроме ChatScreen. |
+`handleTextClick`(HEAD): свои click-events → копирование/попап; чужие (`/msg <ник>`) → `resolveFromForeignClick` → попап. `render`(TAIL): попап + тосты на всех экранах кроме ChatScreen.
 
 ### 9.3 `ChatScreenMixin`
-`render`(TAIL): попап + тосты поверх чата; `mouseClicked`/`mouseScrolled`(HEAD) — ввод в попап; `keyPressed`(HEAD) — ESC закрывает только попап.
+- `render`(TAIL): попап + тосты поверх чата;
+- `mouseClicked`(HEAD): **сначала клик-детект ника в поле ввода** (`tryChatInputDetect` — каретка по ширине префиксов, границы слова, точный/однозначный частичный матчинг), затем ввод в попап;
+- `mouseScrolled`(HEAD) — скролл попапа;
+- `keyPressed`(HEAD) — ESC через `handleEscape()`.
+- `@Shadow input` — доступ к полю ввода чата.
 
 ### 9.4 `ParentElementMixin`
-Drag/release перехват на `ParentElement` (default-методы в 1.21.x), только для ChatScreen при открытом попапе.
+Drag/release попапа (default-методы ParentElement), только ChatScreen + открытый попап.
 
 ### 9.5 `ClientPlayNetworkHandlerMixin`
-`sendChatCommand`(HEAD) → `PunishmentHistory.onCommandSent`.
+`sendChatCommand`(HEAD) → история наказаний.
 
-### 9.6 `InGameHudMixin` (новый)
-`render`(TAIL, сигнатура с `RenderTickCounter`) → `Toasts.render` — уведомления видны в игре без экранов.
+### 9.6 `InGameHudMixin`
+`render`(TAIL, `RenderTickCounter`) → тосты на HUD. ⚠️ Сигнатура именно с RenderTickCounter (float = краш миксина).
 
 ---
 
 ## 10. Ресурсы и данные
 
-- `fabric.mod.json` — манифест; `environment: client`; описание мода.
+- `fabric.mod.json` — манифест; `environment: client`.
 - `stafftools.client.mixins.json` — 6 клиентских миксинов.
-- Хоткей: `key.stafftools.open` = **Right Shift**.
+- Хоткей: Right Shift.
 - Данные: `config/stafftools.json`, `config/stafftools_history.json`.
 
-## 11. Известные технические заметки
+## 11. Технические заметки
 
-- Модули времени: никогда не использовать `% N` во float для epoch-таймстампов (потеря точности ~131 с);
-- Маленькие круги не рисовать через `Ui.drawRoundRect` (radius == size/2 ломает заливку);
-- Анимации появления привязывать к прогрессу `entrance()`, а не к wall-clock;
-- Возврат в главное меню — только через новый экземпляр экрана.
+- `% N` для epoch-таймстампов — только в long (float теряет точность);
+- Маленькие круги — рисовать вручную, не `drawRoundRect`;
+- Анимации входа — от прогресса `entrance()`, не wall-clock;
+- Возврат в главное меню — новый экземпляр экрана;
+- Виджеты — создавать только в `init()`;
+- `renderBackground` в 1.21.1 — **public** (protected нельзя override);
+- `super.render()` рисует фон сам — глушится флагом `suppressBackground`;
+- `super.render()` внутри матрицы анимирует ванильный фон — фон рисовать вне матрицы;
+- `drawRoundRect` + радиус = половина стороны → «4 точки» вместо круга.
