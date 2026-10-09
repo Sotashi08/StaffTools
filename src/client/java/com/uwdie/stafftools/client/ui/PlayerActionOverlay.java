@@ -554,11 +554,21 @@ public final class PlayerActionOverlay {
         TextRenderer tr =
                 client.textRenderer;
 
+        // every label is clamped to the CURRENT panel width, so a long
+        // macro name can never spill outside the frame
+        int headerAvail = panelW - PAD * 2;
+        int rowAvail = panelW - PAD * 2 - 10;
+
         if (player.name() != null) {
 
             context.drawTextWithShadow(
                     tr,
-                    Text.literal(player.name()),
+                    Text.literal(
+                            tr.trimToWidth(
+                                    player.name(),
+                                    headerAvail
+                            )
+                    ),
                     PAD,
                     PAD + 3,
                     Ui.argb(Ui.TEXT, alpha)
@@ -568,8 +578,11 @@ public final class PlayerActionOverlay {
         context.drawTextWithShadow(
                 tr,
                 Text.literal(
-                        Lang.t(Key.OVERLAY_NP,
-                                punishmentSummary(player.name()))
+                        tr.trimToWidth(
+                                Lang.t(Key.OVERLAY_NP,
+                                        punishmentSummary(player.name())),
+                                headerAvail
+                        )
                 ),
                 PAD,
                 PAD + 16,
@@ -1111,7 +1124,12 @@ public final class PlayerActionOverlay {
 
             context.drawCenteredTextWithShadow(
                     tr,
-                    Lang.text(Key.OVERLAY_NO_ACTIONS),
+                    Text.literal(
+                            tr.trimToWidth(
+                                    Lang.t(Key.OVERLAY_NO_ACTIONS),
+                                    panelW - PAD * 2
+                            )
+                    ),
                     panelW / 2,
                     contentTop + 8,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
@@ -1152,9 +1170,12 @@ public final class PlayerActionOverlay {
                     context.drawCenteredTextWithShadow(
                             tr,
                             Text.literal(
-                                    "\u2500 " +
-                                            row.item.label +
-                                            " \u2500"
+                                    tr.trimToWidth(
+                                            "\u2500 " +
+                                                    row.item.label +
+                                                    " \u2500",
+                                            panelW - PAD * 2
+                                    )
                             ),
                             panelW / 2,
                             absY + (SEP_H - 9) / 2,
@@ -1254,7 +1275,12 @@ public final class PlayerActionOverlay {
 
             context.drawTextWithShadow(
                     tr,
-                    Text.literal(row.item.label),
+                    Text.literal(
+                            tr.trimToWidth(
+                                    row.item.label,
+                                    panelW - PAD * 2 - 10
+                            )
+                    ),
                     PAD + 4,
                     absY + (ROW_H - 9) / 2,
                     Ui.argb(color, alpha)
