@@ -87,6 +87,13 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
+        addToggle(row++, Key.TOGGLE_SAVE_POPUP_SIZE,
+                config.isSavePopupSize(),
+                v -> {
+                    config.setSavePopupSize(v);
+                    StafftoolsClient.saveConfig();
+                });
+
         button(
                 colX,
                 contentTop + row * ROW_STEP + 6,

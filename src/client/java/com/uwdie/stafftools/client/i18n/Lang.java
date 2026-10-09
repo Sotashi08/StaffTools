@@ -79,6 +79,8 @@ public final class Lang {
         public static final String TOGGLE_LANGUAGE = "toggle.language";
         public static final String TOGGLE_TOASTS = "toggle.toasts";
         public static final String TOGGLE_CHAT_INPUT = "toggle.chatInput";
+        public static final String TOGGLE_SAVE_POPUP_SIZE =
+                "toggle.savePopupSize";
 
         // Field labels
         public static final String LABEL_NAME = "label.name";
@@ -121,6 +123,7 @@ public final class Lang {
         public static final String OVERLAY_HINT_DRAG = "overlay.hintDrag";
         public static final String OVERLAY_NP = "overlay.np";
         public static final String OVERLAY_COPY_NAME = "overlay.copyName";
+        public static final String OVERLAY_DUP_CHAT = "overlay.dupChat";
         public static final String OVERLAY_ALIAS_TITLE = "overlay.aliasTitle";
 
         // Chat hover
@@ -129,6 +132,7 @@ public final class Lang {
 
         // Toasts
         public static final String TOAST_COPIED = "toast.copied";
+        public static final String TOAST_DUP_CHAT = "toast.dupChat";
         public static final String TOAST_EXECUTED = "toast.executed";
 
         // Punishments
@@ -200,6 +204,7 @@ public final class Lang {
         ru.put(Key.TOGGLE_LANGUAGE, "Язык");
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
+        ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
 
         ru.put(Key.LABEL_NAME, "Название");
         ru.put(Key.LABEL_DESCRIPTION, "Описание");
@@ -226,9 +231,11 @@ public final class Lang {
         ru.put(Key.OVERLAY_CONFIRM, "Ещё клик: %s");
         ru.put(Key.OVERLAY_HINT_CLOSE, "ESC — закрыть");
         ru.put(Key.OVERLAY_HINT_SCROLL, "колесо — навигация");
-        ru.put(Key.OVERLAY_HINT_DRAG, "");
+        ru.put(Key.OVERLAY_HINT_DRAG,
+                "\u2197 \u043F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u044C \u2022 \u2198 \u0440\u0430\u0437\u043C\u0435\u0440");
         ru.put(Key.OVERLAY_NP, "NP: %s");
         ru.put(Key.OVERLAY_COPY_NAME, "Копировать имя");
+        ru.put(Key.OVERLAY_DUP_CHAT, "Дублировать в чат");
         ru.put(Key.OVERLAY_ALIAS_TITLE, "Выберите пункт");
 
         ru.put(Key.MSG_ALIAS_HELP, String.join("\n",
@@ -270,6 +277,7 @@ public final class Lang {
         ru.put(Key.PUN_NO_RESPONSE_TEXT, "Ответ сервера не получен");
 
         ru.put(Key.TOAST_COPIED, "Скопировано: %s");
+        ru.put(Key.TOAST_DUP_CHAT, "Добавлено в чат: %s");
         ru.put(Key.TOAST_EXECUTED, "Выполнено: %s");
 
         Map<String, String> en = new HashMap<>();
@@ -314,6 +322,7 @@ public final class Lang {
         en.put(Key.TOGGLE_LANGUAGE, "Language");
         en.put(Key.TOGGLE_TOASTS, "Notifications");
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
+        en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
 
         en.put(Key.LABEL_NAME, "Name");
         en.put(Key.LABEL_DESCRIPTION, "Description");
@@ -340,9 +349,11 @@ public final class Lang {
         en.put(Key.OVERLAY_CONFIRM, "Click again: %s");
         en.put(Key.OVERLAY_HINT_CLOSE, "ESC to close");
         en.put(Key.OVERLAY_HINT_SCROLL, "scroll to navigate");
-        en.put(Key.OVERLAY_HINT_DRAG, "drag by corner");
+        en.put(Key.OVERLAY_HINT_DRAG,
+                "\u2197 drag \u2022 \u2198 resize");
         en.put(Key.OVERLAY_NP, "NP: %s");
         en.put(Key.OVERLAY_COPY_NAME, "Copy name");
+        en.put(Key.OVERLAY_DUP_CHAT, "Duplicate to chat");
         en.put(Key.OVERLAY_ALIAS_TITLE, "Pick an option");
 
         en.put(Key.MSG_ALIAS_HELP, String.join("\n",
@@ -384,6 +395,7 @@ public final class Lang {
         en.put(Key.PUN_NO_RESPONSE_TEXT, "No server response received");
 
         en.put(Key.TOAST_COPIED, "Copied: %s");
+        en.put(Key.TOAST_DUP_CHAT, "Inserted into chat: %s");
         en.put(Key.TOAST_EXECUTED, "Executed: %s");
 
         TEXTS.put(Language.RU, ru);

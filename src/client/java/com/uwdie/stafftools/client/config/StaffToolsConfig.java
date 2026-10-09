@@ -7,6 +7,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class StaffToolsConfig {
+
+    /** Default popup geometry, also used when saving is turned off. */
+    public static final int DEFAULT_POPUP_WIDTH = 208;
+    public static final int DEFAULT_POPUP_HEIGHT = 240;
+
+    /** Hard limits for the manual resize handle. */
+    public static final int MIN_POPUP_WIDTH = 150;
+    public static final int MIN_POPUP_HEIGHT = 104;
+    public static final int MAX_POPUP_WIDTH = 512;
+    public static final int MAX_POPUP_HEIGHT = 720;
+
     private boolean chatMentionsEnabled = true;
     private boolean clickToCopyEnabled = true;
     private boolean playerActionsEnabled = true;
@@ -14,6 +25,10 @@ public class StaffToolsConfig {
     private boolean dangerousMacroConfirmation = true;
 
     private boolean toastsEnabled = true;
+
+    private boolean savePopupSize = true;
+    private int popupWidth = DEFAULT_POPUP_WIDTH;
+    private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
     private int themeIndex = 0;
 
@@ -59,6 +74,50 @@ public class StaffToolsConfig {
 
     public void setDangerousMacroConfirmation(boolean enabled) {
         this.dangerousMacroConfirmation = enabled;
+    }
+
+    public boolean isSavePopupSize() {
+        return savePopupSize;
+    }
+
+    public void setSavePopupSize(boolean enabled) {
+        this.savePopupSize = enabled;
+    }
+
+    /** Width of the in-chat actions popup, in GUI pixels. */
+    public int getPopupWidth() {
+
+        return Math.clamp(
+                popupWidth,
+                MIN_POPUP_WIDTH,
+                MAX_POPUP_WIDTH
+        );
+    }
+
+    public void setPopupWidth(int width) {
+        this.popupWidth = Math.clamp(
+                width,
+                MIN_POPUP_WIDTH,
+                MAX_POPUP_WIDTH
+        );
+    }
+
+    /** Height of the in-chat actions popup, in GUI pixels. */
+    public int getPopupHeight() {
+
+        return Math.clamp(
+                popupHeight,
+                MIN_POPUP_HEIGHT,
+                MAX_POPUP_HEIGHT
+        );
+    }
+
+    public void setPopupHeight(int height) {
+        this.popupHeight = Math.clamp(
+                height,
+                MIN_POPUP_HEIGHT,
+                MAX_POPUP_HEIGHT
+        );
     }
 
     public boolean isToastsEnabled() {

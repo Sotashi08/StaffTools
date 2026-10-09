@@ -2,17 +2,21 @@ package com.uwdie.stafftools.client.ui;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.config.ActionEntry;
+import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.macro.Macro;
 import com.uwdie.stafftools.client.macro.MacroExecutor;
+import com.uwdie.stafftools.client.mixin.ChatScreenAccessor;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.punishment.PunishmentHistory;
 import com.uwdie.stafftools.client.punishment.PunishmentRecord;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 
 import java.util.ArrayList;
@@ -21,24 +25,41 @@ import java.util.List;
 /**
  * In-chat popup with player actions. Drawn on top of the current screen
  * (after the chat text), near the cursor, without closing the chat.
- * Has a pinned "Copy name" section and can be dragged by the corner grip.
+ * Has two quick buttons ("Copy name" / "Duplicate to chat"), can be
+ * dragged by the top-right grip and resized by the bottom-right corner.
  */
 public final class PlayerActionOverlay {
 
     public static final PlayerActionOverlay INSTANCE =
             new PlayerActionOverlay();
 
-    private static final int PANEL_WIDTH = 208;
     private static final int PAD = 6;
     private static final int HEADER_H = 30;
     private static final int FIXED_H = 20;
+    private static final int FIXED_GAP = 3;
     private static final int FOOTER_H = 26;
     private static final int ROW_H = 16;
     private static final int ROW_GAP = 4;
     private static final int SEP_H = 15;
-    private static final int MAX_HEIGHT = 240;
     private static final int GRIP_SIZE = 16;
+    private static final int RESIZE_SIZE = 14;
+    private static final int MIN_W = StaffToolsConfig.MIN_POPUP_WIDTH;
+    private static final int MIN_H = StaffToolsConfig.MIN_POPUP_HEIGHT;
     private static final long CONFIRM_MS = 3000L;
+
+    // fixed quick buttons
+    private static final int BTN_COPY = 1;
+    private static final int BTN_DUP = 2;
+
+    // smooth scroll tuning: spring + rubber band at the ends
+    private static final float SCROLL_STIFF = 240f;
+    private static final float SCROLL_DAMP = 19f;
+    private static final float SCROLL_RUBBER = 14f;
+    private static final float EDGE_STIFF = 420f;
+    private static final float EDGE_DAMP = 30f;
+    private static final int FADE_H = 14;
+    private static final int BAR_W = 3;
+    private static final long BAR_IDLE_MS = 900L;
 
     // alias modal geometry
     private static final int ALIAS_HEADER_H = 28;
@@ -52,6 +73,12 @@ public final class PlayerActionOverlay {
     private double anchorY;
     private float scroll;
     private float scrollTarget;
+    private float scrollVel;
+    private int maxScroll;
+    private long lastScrollAt;
+    private float barAlpha;
+    private float barPos;
+    private float barLen;
     private long openTime;
     private long confirmAt;
     private RowItem confirmItem;
@@ -80,6 +107,7 @@ public final class PlayerActionOverlay {
 
     private boolean manuallyPlaced;
     private boolean dragging;
+    private boolean resizing;
     private double grabDX;
     private double grabDY;
 
@@ -116,12 +144,30 @@ public final class PlayerActionOverlay {
         this.ownerScreen = client.currentScreen;
         this.scroll = 0;
         this.scrollTarget = 0;
+        this.scrollVel = 0;
+        this.lastScrollAt = System.currentTimeMillis();
+        this.barAlpha = 0;
+        this.barPos = 0;
+        this.barLen = 0;
         this.confirmItem = null;
         this.confirmAt = 0L;
         this.manuallyPlaced = false;
         this.dragging = false;
+        this.resizing = false;
         this.openTime = System.currentTimeMillis();
         this.flashItem = null;
+
+        // user size last (default when the "save size" toggle is off)
+        StaffToolsConfig config =
+                StafftoolsClient.getConfig();
+
+        this.panelW = config.isSavePopupSize()
+                ? config.getPopupWidth()
+                : StaffToolsConfig.DEFAULT_POPUP_WIDTH;
+
+        this.panelH = config.isSavePopupSize()
+                ? config.getPopupHeight()
+                : StaffToolsConfig.DEFAULT_POPUP_HEIGHT;
 
         this.anchorX = client.mouse.getX();
         this.anchorY = client.mouse.getY();
@@ -160,6 +206,7 @@ public final class PlayerActionOverlay {
         this.confirmItem = null;
         this.confirmAt = 0L;
         this.dragging = false;
+        this.resizing = false;
         this.flashItem = null;
 
         clearAliasState();
@@ -258,25 +305,6 @@ public final class PlayerActionOverlay {
 
         contentTop = PAD + HEADER_H + FIXED_H;
 
-        int contentH = cursorY + PAD + FOOTER_H;
-        int visibleH = Math.min(contentH, MAX_HEIGHT);
-
-        int maxScroll = Math.max(
-                0,
-                contentH - visibleH
-        );
-
-        scrollTarget = Math.clamp(scrollTarget,
-                0f, maxScroll);
-
-        scroll = Math.clamp(scroll,
-                0f, maxScroll);
-
-        panelW = PANEL_WIDTH;
-        panelH = visibleH;
-
-        contentBottom = panelH - PAD - FOOTER_H;
-
         MinecraftClient client =
                 MinecraftClient.getInstance();
 
@@ -285,6 +313,40 @@ public final class PlayerActionOverlay {
 
         int screenHeight =
                 client.getWindow().getScaledHeight();
+
+        // user-set size, clamped so the frame never leaves the screen
+        // and never becomes smaller than its own header + one row
+        panelW = Math.clamp(
+                panelW,
+                MIN_W,
+                Math.max(MIN_W, screenWidth - 8)
+        );
+
+        panelH = Math.clamp(
+                panelH,
+                MIN_H,
+                Math.max(MIN_H, screenHeight - 8)
+        );
+
+        contentBottom = Math.max(
+                contentTop,
+                panelH - PAD - FOOTER_H
+        );
+
+        int contentH = cursorY + PAD + FOOTER_H;
+
+        maxScroll = Math.max(
+                0,
+                contentH - panelH
+        );
+
+        // target may sit a bit past the edge: the spring plus the
+        // rubber-band force settles it back onto the bound
+        scrollTarget = Math.clamp(
+                scrollTarget,
+                -SCROLL_RUBBER,
+                maxScroll + SCROLL_RUBBER
+        );
 
         if (!manuallyPlaced) {
 
@@ -318,16 +380,36 @@ public final class PlayerActionOverlay {
                 mouseY <= panelY + GRIP_SIZE;
     }
 
-    private boolean inCopyRow(double mouseX, double mouseY) {
+    private boolean inResize(double mouseX, double mouseY) {
+        return mouseX >= panelX + panelW - RESIZE_SIZE &&
+                mouseX <= panelX + panelW &&
+                mouseY >= panelY + panelH - RESIZE_SIZE &&
+                mouseY <= panelY + panelH;
+    }
+
+    /**
+     * Quick-button strip under the header: two equal halves.
+     * Returns {@link #BTN_COPY}, {@link #BTN_DUP} or 0.
+     */
+    private int inFixedRow(double mouseX, double mouseY) {
 
         if (!insidePanel(mouseX, mouseY)) {
-            return false;
+            return 0;
         }
 
         int top = PAD + HEADER_H;
 
-        return mouseY >= panelY + top &&
-                mouseY < panelY + top + FIXED_H;
+        if (mouseY < panelY + top ||
+                mouseY >= panelY + top + FIXED_H) {
+
+            return 0;
+        }
+
+        int half = (panelW - PAD * 2 - FIXED_GAP) / 2;
+
+        return mouseX < panelX + PAD + half
+                ? BTN_COPY
+                : BTN_DUP;
     }
 
     private int hitRow(double mouseY) {
@@ -437,14 +519,9 @@ public final class PlayerActionOverlay {
 
         layout();
 
-        // smooth scroll: ease `scroll` toward `scrollTarget`
-        float diff = scrollTarget - scroll;
-
-        if (Math.abs(diff) > 0.25f) {
-            scroll += diff * Math.min(1f, delta * 14f);
-        } else {
-            scroll = scrollTarget;
-        }
+        // smooth "sticky" scroll: springy settle with a slight
+        // overshoot and a rubber band at the ends
+        updateScroll(delta);
 
         var matrices =
                 context.getMatrices();
@@ -465,20 +542,12 @@ public final class PlayerActionOverlay {
                 1
         );
 
-        Ui.drawPanel(
+        Ui.drawPopupFrame(
                 context,
                 0,
                 0,
                 panelW,
                 panelH,
-                alpha
-        );
-
-        Ui.drawHeader(
-                context,
-                0,
-                0,
-                panelW,
                 alpha
         );
 
@@ -507,7 +576,7 @@ public final class PlayerActionOverlay {
                 Ui.argb(Ui.TEXT_DIM, alpha)
         );
 
-        drawCopyRow(
+        drawFixedRows(
                 context,
                 tr,
                 mouseX,
@@ -545,6 +614,11 @@ public final class PlayerActionOverlay {
                     alpha
             );
 
+            drawScrollMasks(
+                    context,
+                    alpha
+            );
+
             context.disableScissor();
 
         } else {
@@ -558,6 +632,11 @@ public final class PlayerActionOverlay {
             );
         }
 
+        drawScrollbar(
+                context,
+                alpha
+        );
+
         drawFooter(
                 context,
                 tr,
@@ -565,6 +644,14 @@ public final class PlayerActionOverlay {
         );
 
         drawGrip(
+                context,
+                tr,
+                mouseX,
+                mouseY,
+                alpha
+        );
+
+        drawResizeHandle(
                 context,
                 tr,
                 mouseX,
@@ -597,6 +684,153 @@ public final class PlayerActionOverlay {
         }
 
         return Integer.toString(total);
+    }
+
+    /**
+     * Spring integration for the list scroll. Slightly underdamped, so
+     * every notch settles with a small overshoot ("sticky" feel), and a
+     * strong restoring force keeps the content from flying past the ends
+     * (rubber band).
+     */
+    private void updateScroll(float delta) {
+
+        float step = Ui.clamp01(delta) * 0.05f;
+        float target = Math.clamp(
+                scrollTarget,
+                -SCROLL_RUBBER,
+                maxScroll + SCROLL_RUBBER
+        );
+
+        for (int i = 0; i < 3; i++) {
+
+            float s = step / 3f;
+
+            float accel =
+                    (target - scroll) * SCROLL_STIFF
+                            - scrollVel * SCROLL_DAMP;
+
+            float over = scroll < 0f
+                    ? scroll
+                    : scroll > maxScroll
+                    ? scroll - maxScroll
+                    : 0f;
+
+            if (over != 0f) {
+                accel -= over * EDGE_STIFF;
+                accel -= scrollVel * EDGE_DAMP;
+            }
+
+            scrollVel += accel * s;
+            scroll += scrollVel * s;
+        }
+
+        if (Math.abs(scroll - target) < 0.05f &&
+                Math.abs(scrollVel) < 0.05f) {
+
+            scroll = target;
+            scrollVel = 0f;
+        }
+
+        updateScrollbar(delta);
+    }
+
+    /** Slim scrollbar: thumb follows the list, fades out when idle. */
+    private void updateScrollbar(float delta) {
+
+        float trackH = contentBottom - contentTop;
+
+        boolean active =
+                maxScroll > 0 &&
+                        (Math.abs(scrollVel) > 25f ||
+                                System.currentTimeMillis()
+                                        - lastScrollAt < BAR_IDLE_MS);
+
+        // fade in fast, drift out slowly
+        float rate = active ? 11f : 3.5f;
+
+        barAlpha += ((active ? 1f : 0f) - barAlpha)
+                * Math.min(1f, delta * rate);
+
+        float thumbH = trackH <= 0f
+                ? 0f
+                : Math.max(
+                        16f,
+                        trackH * trackH / (trackH + maxScroll)
+                );
+
+        float travel = Math.max(0f, trackH - thumbH);
+        float t = maxScroll <= 0f
+                ? 0f
+                : Ui.clamp01(scroll / maxScroll);
+
+        barLen += (thumbH - barLen)
+                * Math.min(1f, delta * 12f);
+
+        barPos += (t * travel - barPos)
+                * Math.min(1f, delta * 9f);
+    }
+
+    /**
+     * Soft fades above/below the list, only while there is content
+     * hidden that way — the "sticky" mask of a scrolling region.
+     */
+    private void drawScrollMasks(
+            DrawContext context,
+            float alpha
+    ) {
+
+        float top = Ui.clamp01(scroll / FADE_H);
+        float bottom = Ui.clamp01((maxScroll - scroll) / FADE_H);
+
+        if (top > 0.01f) {
+
+            context.fillGradient(
+                    PAD,
+                    contentTop,
+                    panelW - PAD,
+                    contentTop + FADE_H,
+                    Ui.argb(Ui.PANEL_BG, alpha * top),
+                    Ui.argb(Ui.PANEL_BG, 0f)
+            );
+        }
+
+        if (bottom > 0.01f) {
+
+            context.fillGradient(
+                    PAD,
+                    contentBottom - FADE_H,
+                    panelW - PAD,
+                    contentBottom,
+                    Ui.argb(Ui.PANEL_BG, 0f),
+                    Ui.argb(Ui.PANEL_BG, alpha * bottom)
+            );
+        }
+    }
+
+    private void drawScrollbar(
+            DrawContext context,
+            float alpha
+    ) {
+
+        if (barAlpha <= 0.01f || barLen < 4f) {
+            return;
+        }
+
+        int x = panelW - PAD - BAR_W;
+        int y = contentTop + 2 + Math.round(barPos);
+
+        Ui.drawRoundRect(
+                context,
+                x,
+                y,
+                BAR_W,
+                Math.round(barLen),
+                2,
+                Ui.argb(
+                        Ui.mix(Ui.ACCENT_2, Ui.TEXT, 0.12f),
+                        alpha * barAlpha * 0.85f
+                )
+        );
     }
 
     /**
@@ -655,24 +889,12 @@ public final class PlayerActionOverlay {
         aliasGX = (screenWidth - aliasGW) / 2 + offsetX;
         aliasGY = (screenHeight - aliasGH) / 2;
 
-        Ui.drawPanel(
+        Ui.drawPopupFrame(
                 context,
                 aliasGX,
                 aliasGY,
                 aliasGW,
                 aliasGH,
-                modalAlpha
-        );
-
-        // accent header strip
-        Ui.drawGradientH(
-                context,
-                aliasGX + 3,
-                aliasGY + 1,
-                aliasGW - 6,
-                2,
-                Ui.ACCENT,
-                Ui.ACCENT_2,
                 modalAlpha
         );
 
@@ -775,7 +997,11 @@ public final class PlayerActionOverlay {
         }
     }
 
-    private void drawCopyRow(
+    /**
+     * The two quick buttons under the header: "Copy name" (left) and
+     * "Duplicate to chat" (right), split in two equal halves.
+     */
+    private void drawFixedRows(
             DrawContext context,
             TextRenderer tr,
             int mouseX,
@@ -784,46 +1010,92 @@ public final class PlayerActionOverlay {
     ) {
 
         int y = PAD + HEADER_H;
+        int h = FIXED_H - 2;
+        int half = (panelW - PAD * 2 - FIXED_GAP) / 2;
 
-        int bg = Ui.argb(0x22000000, alpha);
+        int active = inFixedRow(mouseX, mouseY);
 
-        if (inCopyRow(mouseX, mouseY)) {
-            bg = Ui.argb(0x403F8AE0, alpha);
-        }
-
-        context.fill(
+        drawFixedButton(
+                context,
+                tr,
                 PAD,
                 y,
-                panelW - PAD,
-                y + FIXED_H - 2,
-                bg
+                half,
+                h,
+                "\uD83D\uDCCB",
+                Lang.t(Key.OVERLAY_COPY_NAME),
+                active == BTN_COPY,
+                alpha
         );
+
+        drawFixedButton(
+                context,
+                tr,
+                PAD + half + FIXED_GAP,
+                y,
+                panelW - PAD * 2 - half - FIXED_GAP,
+                h,
+                "\uD83D\uDCE5",
+                Lang.t(Key.OVERLAY_DUP_CHAT),
+                active == BTN_DUP,
+                alpha
+        );
+    }
+
+    private void drawFixedButton(
+            DrawContext context,
+            TextRenderer tr,
+            int x,
+            int y,
+            int w,
+            int h,
+            String icon,
+            String label,
+            boolean hovered,
+            float alpha
+    ) {
+
+        int bg = Ui.argb(0x22000000, alpha);
+        int border = 0xFF2C3B55;
+
+        if (hovered) {
+            bg = Ui.argb(0x403F8AE0, alpha);
+            border = Ui.ACCENT;
+        }
+
+        context.fill(x, y, x + w, y + h, bg);
 
         Ui.drawRoundBorder(
                 context,
-                PAD,
+                x,
                 y,
-                panelW - PAD * 2,
-                FIXED_H - 2,
+                w,
+                h,
                 3,
-                Ui.argb(
-                        inCopyRow(mouseX, mouseY)
-                                ? Ui.ACCENT
-                                : 0xFF2C3B55,
-                        alpha
-                )
+                Ui.argb(border, alpha)
         );
 
-        String text =
-                "\uD83D\uDCCB " +
-                        Lang.t(Key.OVERLAY_COPY_NAME);
+        String text = icon + " " + label;
+        int avail = w - 8;
+
+        // narrow popup: drop the icon before trimming the label
+        if (tr.getWidth(text) > avail &&
+                tr.getWidth(label) <= avail) {
+
+            text = label;
+        }
+
+        text = tr.trimToWidth(text, avail);
 
         context.drawTextWithShadow(
                 tr,
                 Text.literal(text),
-                panelW / 2 - tr.getWidth(text) / 2,
-                y + (FIXED_H - 9) / 2,
-                Ui.argb(Ui.TEXT, alpha)
+                x + w / 2 - tr.getWidth(text) / 2,
+                y + (h - 9) / 2,
+                Ui.argb(
+                        hovered ? Ui.ACCENT_SOFT : Ui.TEXT,
+                        alpha
+                )
         );
     }
 
@@ -1014,23 +1286,98 @@ public final class PlayerActionOverlay {
                         " • " +
                         Lang.t(Key.OVERLAY_HINT_SCROLL);
 
+        String line2 =
+                Lang.t(Key.OVERLAY_HINT_DRAG);
+
         context.drawCenteredTextWithShadow(
                 tr,
-                Text.literal(line1),
+                Text.literal(
+                        tr.trimToWidth(line1, panelW - PAD * 2)
+                ),
                 panelW / 2,
                 panelH - PAD - 9,
                 Ui.argb(0xFF556070, alpha)
         );
 
-        context.drawCenteredTextWithShadow(
-                tr,
-                Text.literal(
-                        Lang.t(Key.OVERLAY_HINT_DRAG)
-                ),
-                panelW / 2,
-                panelH - PAD + 2,
-                Ui.argb(0xFF3A4455, alpha)
+        if (!line2.isEmpty()) {
+
+            context.drawCenteredTextWithShadow(
+                    tr,
+                    Text.literal(
+                            tr.trimToWidth(line2, panelW - PAD * 2)
+                    ),
+                    panelW / 2,
+                    panelH - PAD + 2,
+                    Ui.argb(0xFF5A6A80, alpha)
+            );
+        }
+    }
+
+    /**
+     * Bottom-right corner: drag to resize the whole popup (every element
+     * re-flows through the new width/height).
+     */
+    private void drawResizeHandle(
+            DrawContext context,
+            TextRenderer tr,
+            double mouseX,
+            double mouseY,
+            float alpha
+    ) {
+
+        int x = panelW - RESIZE_SIZE;
+        int y = panelH - RESIZE_SIZE;
+
+        boolean hovered =
+                resizing || inResize(mouseX, mouseY);
+
+        int border = hovered
+                ? Ui.ACCENT
+                : Ui.mix(0xFF3A4A66, Ui.ACCENT, 0.35f);
+
+        if (hovered) {
+
+            context.fill(
+                    x + 1,
+                    y + 1,
+                    panelW - 1,
+                    panelH - 1,
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.38f),
+                            alpha
+                    )
+            );
+        }
+
+        Ui.drawRoundBorder(
+                context,
+                x,
+                y,
+                RESIZE_SIZE,
+                RESIZE_SIZE,
+                3,
+                Ui.argb(border, alpha)
         );
+
+        // three diagonal ticks pointing to the corner
+        int dotColor = hovered
+                ? Ui.ACCENT_SOFT
+                : Ui.mix(0xFF556070, Ui.ACCENT_SOFT, 0.4f);
+
+        for (int i = 0; i < 3; i++) {
+
+            int len = 3 + i * 3;
+            int ox = panelW - 3 - len;
+            int oy = panelH - 3 - i * 3;
+
+            context.fill(
+                    ox,
+                    oy,
+                    panelW - 3 - i * 3,
+                    oy + 1,
+                    Ui.argb(dotColor, alpha)
+            );
+        }
     }
 
     private void drawGrip(
@@ -1066,12 +1413,16 @@ public final class PlayerActionOverlay {
 
         if (hovered) {
 
+            // opaque so the corner reads as one piece with the frame
             context.fill(
                     gx + 1,
                     gy + 1,
                     gx + GRIP_SIZE - 1,
                     gy + GRIP_SIZE - 1,
-                    Ui.argb(0x603F8AE0, alpha)
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.38f),
+                            alpha
+                    )
             );
         }
 
@@ -1179,13 +1530,32 @@ public final class PlayerActionOverlay {
             return true;
         }
 
+        if (inResize(mouseX, mouseY)) {
+
+            resizing = true;
+            manuallyPlaced = true;
+
+            // negative offsets from the bottom-right corner
+            grabDX = mouseX - (panelX + panelW);
+            grabDY = mouseY - (panelY + panelH);
+
+            return true;
+        }
+
         if (!insidePanel(mouseX, mouseY)) {
             requestClose(0);
             return false;
         }
 
-        if (inCopyRow(mouseX, mouseY)) {
+        int fixed = inFixedRow(mouseX, mouseY);
+
+        if (fixed == BTN_COPY) {
             copyName();
+            return true;
+        }
+
+        if (fixed == BTN_DUP) {
+            duplicateToChat();
             return true;
         }
 
@@ -1208,7 +1578,27 @@ public final class PlayerActionOverlay {
             double deltaY
     ) {
 
-        if (!open || !dragging) {
+        if (!open) {
+            return false;
+        }
+
+        if (resizing) {
+
+            // top-left stays put: only width/height follow the cursor
+            panelW = (int) Math.round(
+                    mouseX - grabDX - panelX
+            );
+
+            panelH = (int) Math.round(
+                    mouseY - grabDY - panelY
+            );
+
+            layout();
+
+            return true;
+        }
+
+        if (!dragging) {
             return false;
         }
 
@@ -1226,13 +1616,41 @@ public final class PlayerActionOverlay {
             int button
     ) {
 
-        if (!open || !dragging) {
+        if (!open) {
+            return false;
+        }
+
+        if (resizing) {
+
+            resizing = false;
+            savePopupSize();
+
+            return true;
+        }
+
+        if (!dragging) {
             return false;
         }
 
         dragging = false;
 
         return true;
+    }
+
+    /** Persists the popup size when the "save size" toggle is on. */
+    private void savePopupSize() {
+
+        StaffToolsConfig config =
+                StafftoolsClient.getConfig();
+
+        if (!config.isSavePopupSize()) {
+            return;
+        }
+
+        config.setPopupWidth(panelW);
+        config.setPopupHeight(panelH);
+
+        StafftoolsClient.saveConfig();
     }
 
     public boolean mouseScrolled(
@@ -1280,6 +1698,8 @@ public final class PlayerActionOverlay {
             return false;
         }
 
+        lastScrollAt = System.currentTimeMillis();
+
         scrollTarget += verticalAmount > 0
                 ? -ROW_H
                 : ROW_H;
@@ -1296,6 +1716,59 @@ public final class PlayerActionOverlay {
 
         Toasts.INSTANCE.success(
                 Lang.t(Key.TOAST_COPIED, player.name())
+        );
+
+        requestClose(0);
+    }
+
+    /**
+     * Inserts the nick into the chat input at the caret, so the command
+     * can be typed right after it. Falls back to the clipboard when the
+     * chat screen is not the one currently open.
+     */
+    private void duplicateToChat() {
+
+        MinecraftClient client =
+                MinecraftClient.getInstance();
+
+        String nick = player.name();
+
+        if (client.currentScreen instanceof ChatScreen chat) {
+
+            TextFieldWidget field =
+                    ((ChatScreenAccessor) chat)
+                            .stafftools$getChatField();
+
+            if (field != null) {
+
+                String text = field.getText();
+                int caret = Math.clamp(
+                        field.getCursor(),
+                        0,
+                        text.length()
+                );
+
+                field.setText(
+                        text.substring(0, caret) +
+                                nick +
+                                text.substring(caret)
+                );
+
+                field.setCursor(caret + nick.length(), false);
+
+                Toasts.INSTANCE.success(
+                        Lang.t(Key.TOAST_DUP_CHAT, nick)
+                );
+
+                requestClose(0);
+                return;
+            }
+        }
+
+        client.keyboard.setClipboard(nick);
+
+        Toasts.INSTANCE.success(
+                Lang.t(Key.TOAST_COPIED, nick)
         );
 
         requestClose(0);
