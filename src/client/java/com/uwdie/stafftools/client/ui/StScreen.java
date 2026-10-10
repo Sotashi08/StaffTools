@@ -77,6 +77,9 @@ public abstract class StScreen extends Screen {
                         height,
                         Lang.text(key),
                         onPress,
+                        // screen open-time: a rebuild of the widget list
+                        // must not replay the entrance animation
+                        openTime,
                         nextSlot(),
                         accent
                 );

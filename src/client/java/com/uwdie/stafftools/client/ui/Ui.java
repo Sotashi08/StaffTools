@@ -352,58 +352,168 @@ public final class Ui {
             float t = wave(i / (float) (perimeter - 1));
             int c = argb(mix(colorFrom, colorTo, t), alpha);
 
-            int j = Math.min(i + 3, perimeter);
-
-            // top edge: left -> right
-            fillArc(context, x + r, y, i, j, 0, top, 1, 0, c);
-
-            // right edge: top -> bottom
-            fillArc(context, x + width - 1, y + r, i, j, top, side,
-                    0, 1, c);
-
-            // bottom edge: right -> left
-            fillArc(context, x + width - r - 1, y + height - 1,
-                    i, j, top + side, top, -1, 0, c);
-
-            // left edge: bottom -> top
-            fillArc(context, x, y + height - r - 1,
-                    i, j, top + side + top, side, 0, -1, c);
+            paintEdges(
+                    context,
+                    x, y, width, height, r,
+                    top, side,
+                    i, Math.min(i + 3, perimeter),
+                    1, c
+            );
         }
     }
 
-    /** Paints the {@code [from,to)} slice of one straight border edge. */
-    private static void fillArc(
+    /** Smooth 0..1 ramp, flat at both ends. */
+    public static float smoothstep(float edge0, float edge1, float t) {
+
+        if (edge1 == edge0) {
+            return t < edge0 ? 0f : 1f;
+        }
+
+        float x = clamp01((t - edge0) / (edge1 - edge0));
+
+        return x * x * (3f - 2f * x);
+    }
+
+    /**
+     * Paints the {@code [from, to)} slice of the frame perimeter.
+     * The slice is wrapped into {@code [0, perimeter)} first, so it may
+     * cross the seam between the left and the top edge.
+     */
+    private static void strokePerimeter(
             DrawContext context,
-            int originX,
-            int originY,
-            int i,
-            int j,
-            int start,
-            int length,
-            int stepX,
-            int stepY,
+            int x,
+            int y,
+            int width,
+            int height,
+            int radius,
+            int top,
+            int side,
+            int perimeter,
+            int from,
+            int to,
+            int thickness,
             int color
     ) {
 
-        int from = Math.max(i, start);
-        int to = Math.min(j, start + length);
+        int len = to - from;
 
-        if (to <= from) {
+        if (len <= 0 || perimeter <= 0) {
             return;
         }
 
-        int x1 = originX + (from - start) * stepX;
-        int y1 = originY + (from - start) * stepY;
-        int x2 = originX + (to - start) * stepX + Math.max(stepX, 0);
-        int y2 = originY + (to - start) * stepY + Math.max(stepY, 0);
+        int cursor = Math.floorMod(from, perimeter);
 
-        context.fill(
-                Math.min(x1, x2),
-                Math.min(y1, y2),
-                Math.max(x1, x2),
-                Math.max(y1, y2),
-                color
-        );
+        while (len > 0) {
+
+            int end = Math.min(cursor + len, perimeter);
+
+            paintEdges(
+                    context,
+                    x, y, width, height, radius,
+                    top, side,
+                    cursor, end,
+                    thickness, color
+            );
+
+            len -= end - cursor;
+            cursor = 0;
+        }
+    }
+
+    /**
+     * Paints one straight border edge of a rounded rectangle as a
+     * {@code thickness} px stroke centred on the edge line.
+     *
+     * {@code lineX}/{@code lineY} is the point at perimeter offset
+     * {@code edgeStart}; the edge runs {@code edgeLength} pixels in the
+     * {@code (dirX, dirY)} direction. Only the part of the slice that
+     * belongs to this edge is painted.
+     */
+    private static void paintEdges(
+            DrawContext context,
+            int x,
+            int y,
+            int width,
+            int height,
+            int radius,
+            int top,
+            int side,
+            int from,
+            int to,
+            int thickness,
+            int color
+    ) {
+
+        // top edge: left -> right
+        edgeSpan(context, x + radius, y, from, to,
+                0, top, 1, 0, thickness, color);
+
+        // right edge: top -> bottom
+        edgeSpan(context, x + width - 1, y + radius, from, to,
+                top, side, 0, 1, thickness, color);
+
+        // bottom edge: right -> left
+        edgeSpan(context, x + width - radius - 1, y + height - 1, from, to,
+                top + side, top, -1, 0, thickness, color);
+
+        // left edge: bottom -> top
+        edgeSpan(context, x, y + height - radius - 1, from, to,
+                top + side + top, side, 0, -1, thickness, color);
+    }
+
+    /** Edge slice painter backing {@link #paintEdges}. */
+    private static void edgeSpan(
+            DrawContext context,
+            int lineX,
+            int lineY,
+            int from,
+            int to,
+            int edgeStart,
+            int edgeLength,
+            int dirX,
+            int dirY,
+            int thickness,
+            int color
+    ) {
+
+        int s = Math.max(from, edgeStart);
+        int e = Math.min(to, edgeStart + edgeLength);
+
+        if (e <= s) {
+            return;
+        }
+
+        int half = (thickness - 1) / 2;
+
+        int ax = lineX + (s - edgeStart) * dirX;
+        int ay = lineY + (s - edgeStart) * dirY;
+        int bx = lineX + (e - edgeStart) * dirX;
+        int by = lineY + (e - edgeStart) * dirY;
+
+        int x1;
+        int x2;
+        int y1;
+        int y2;
+
+        if (dirX != 0) {
+
+            x1 = Math.min(ax, bx);
+            x2 = Math.max(ax, bx);
+
+            // the stroke grows perpendicular to the direction of travel
+            y1 = ay - half;
+            y2 = ay + thickness - half;
+
+        } else {
+
+            x1 = ax - half;
+            x2 = ax + thickness - half;
+
+            y1 = Math.min(ay, by);
+            y2 = Math.max(ay, by);
+        }
+
+        context.fill(x1, y1, x2, y2, color);
     }
 
     /**
@@ -512,6 +622,198 @@ public final class Ui {
                 ACCENT,
                 alpha * 0.45f
         );
+    }
+
+    /**
+     * Animated overlay frame for the main menu: two smooth, high-contrast
+     * bars orbiting the panel border clockwise.
+     *
+     * Each bar is a theme gradient (tail -> accent, head -> near white)
+     * with feathered edges and a layered glow. Motion is sub-pixel smooth:
+     * a bar is not drawn as whole pixels but as half-pixel slices whose
+     * alpha is averaged over two taps inside their own width, so nothing
+     * steps and both ends read as feathered instead of cut.
+     * Colours are read live from the theme, so a theme switch applies on
+     * the very next frame.
+     */
+    public static void drawOrbitFrame(
+            DrawContext context,
+            int x,
+            int y,
+            int width,
+            int height,
+            float alpha
+    ) {
+
+        int inset = 5;
+        int radius = 6;
+
+        int ix = x + inset;
+        int iy = y + inset;
+        int iw = width - inset * 2;
+        int ih = height - inset * 2;
+
+        if (iw <= radius * 2 || ih <= radius * 2
+                || alpha <= 0.004f) {
+            return;
+        }
+
+        // resting hairline, so the frame reads even when idle
+        drawRoundBorder(
+                context,
+                ix, iy, iw, ih, radius,
+                argb(mix(PANEL_BORDER, ACCENT, 0.35f), alpha * 0.55f)
+        );
+
+        int top = iw - radius * 2;
+        int side = ih - radius * 2;
+        int perimeter = 2 * top + 2 * side;
+
+        if (perimeter <= 0) {
+            return;
+        }
+
+        long time = System.currentTimeMillis();
+
+        double period = 9000.0;   // ms per full lap
+
+        // double precision, so a long-running session stays smooth
+        // (float loses all precision at epoch-scale timestamps)
+        double phase = (time / period) % 1.0;
+
+        float phaseT = (float) (phase * perimeter);
+
+        int bars = 2;
+
+        int barLength = Math.max(
+                40,
+                Math.min(96, perimeter / 8)
+        );
+
+        for (int i = 0; i < bars; i++) {
+
+            // tail of the bar, running clockwise from the top-left
+            float tail =
+                    (phaseT + i * (perimeter / (float) bars)
+                            + perimeter) % perimeter;
+
+            drawOrbitBar(
+                    context,
+                    ix, iy, iw, ih, radius,
+                    top, side, perimeter,
+                    tail, barLength,
+                    alpha
+            );
+        }
+    }
+
+    /**
+     * One bar: a smooth alpha envelope from the tail (dark, low alpha)
+     * to the head (near white, high alpha).
+     *
+     * The bar is painted as half-pixel slices — two per screen pixel —
+     * so the alpha of every slice is a genuine average over its own
+     * width and the travel is sub-pixel smooth.
+     */
+    private static void drawOrbitBar(
+            DrawContext context,
+            int x,
+            int y,
+            int width,
+            int height,
+            int radius,
+            int top,
+            int side,
+            int perimeter,
+            float tail,
+            int length,
+            float alpha
+    ) {
+
+        if (length <= 0 || alpha <= 0.004f) {
+            return;
+        }
+
+        // tail colour: accent nudged towards white, so the bar stays
+        // richer than the panel edge instead of a flat grey line
+        int cold = mix(ACCENT, TEXT, 0.12f);
+
+        // head colour: accent brightened towards white — this is what
+        // makes the bar read brighter than the base theme colour
+        int head = mix(mix(ACCENT_2, TEXT, 0.55f), ACCENT, 0.25f);
+
+        // glow colour: a little dimmer, so the halo reads as light
+        // bleeding out of the bar instead of a second bar
+        int glow = mix(cold, head, 0.55f);
+
+        int slices = length * 2;
+
+        for (int i = 0; i < slices; i++) {
+
+            // 0 at the tail, 1 at the head
+            float t = (i + 0.5f) / slices;
+
+            float a = barEnvelope(t);
+
+            if (a <= 0.004f) {
+                continue;
+            }
+
+            float pos = tail + t * length;
+
+            // half-pixel slice: [pos - 0.5, pos + 0.5)
+            int p0 = Math.round(pos - 0.5f);
+            int p1 = p0 + 1;
+
+            int rgb = mix(cold, head, easeOutCubic(t));
+
+            // wide soft halo, drawn under the core
+            strokePerimeter(
+                    context,
+                    x, y, width, height, radius,
+                    top, side, perimeter,
+                    p0, p1,
+                    5,
+                    argb(glow, alpha * a * 0.10f)
+            );
+
+            // tight halo: most of the glow
+            strokePerimeter(
+                    context,
+                    x, y, width, height, radius,
+                    top, side, perimeter,
+                    p0, p1,
+                    3,
+                    argb(rgb, alpha * a * 0.28f)
+            );
+
+            // bright core
+            strokePerimeter(
+                    context,
+                    x, y, width, height, radius,
+                    top, side, perimeter,
+                    p0, p1,
+                    1,
+                    argb(rgb, alpha * a)
+            );
+        }
+    }
+
+    /**
+     * Brightness envelope along one bar: cubic ease-out from the tail,
+     * a bright plateau and a short feather at the head, so both ends are
+     * smoothed instead of cut.
+     */
+    private static float barEnvelope(float t) {
+
+        if (t <= 0f || t >= 1f) {
+            return 0f;
+        }
+
+        float rise = easeOutCubic(t / 0.45f);
+        float fall = 1f - 0.35f * smoothstep(0.86f, 1f, t);
+
+        return rise * fall;
     }
 
     public static void drawHeader(

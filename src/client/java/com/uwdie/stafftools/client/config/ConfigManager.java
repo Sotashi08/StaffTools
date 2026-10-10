@@ -54,6 +54,11 @@ public class ConfigManager {
 
     public void save() {
         try {
+            // the active profile mirrors the live settings: without this,
+            // edits made in the macro / action lists would never reach
+            // the stored snapshot
+            config.saveActiveProfile();
+
             Files.createDirectories(path.getParent());
 
             Files.writeString(

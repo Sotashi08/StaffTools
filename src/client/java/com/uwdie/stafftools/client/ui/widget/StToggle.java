@@ -78,6 +78,14 @@ public class StToggle extends ButtonWidget {
         }
     }
 
+    /**
+     * Draw + hit-test toggle. Used by the detection settings to hide
+     * rows that are currently scrolled out of view.
+     */
+    public void setVisible(boolean visible) {
+        this.visible = visible;
+    }
+
     public boolean isOn() {
         return value;
     }

@@ -31,11 +31,44 @@ public class StButton extends ButtonWidget {
             int accent
     ) {
 
+        this(
+                x, y, width, height, message, onPress,
+                System.currentTimeMillis(),
+                slot,
+                accent
+        );
+    }
+
+    /**
+     * @param appear when the button starts fading in. Screens pass their
+     *                own open-time, so a list rebuild never replays the
+     *                entrance animation for the widgets that stay.
+     */
+    public StButton(
+            int x,
+            int y,
+            int width,
+            int height,
+            Text message,
+            PressAction onPress,
+            long appear,
+            int slot,
+            int accent
+    ) {
+
         super(x, y, width, height, message, onPress, DEFAULT_NARRATION_SUPPLIER);
 
-        this.appear = System.currentTimeMillis();
+        this.appear = appear;
         this.slot = slot;
         this.accent = accent;
+    }
+
+    /**
+     * Draw + hit-test toggle. Used by the list screens to hide the
+     * buttons of rows that are currently scrolled out of view.
+     */
+    public void setVisible(boolean visible) {
+        this.visible = visible;
     }
 
     @Override

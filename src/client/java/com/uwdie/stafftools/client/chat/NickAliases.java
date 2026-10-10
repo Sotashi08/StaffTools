@@ -73,9 +73,22 @@ public final class NickAliases {
         }
     }
 
+    /** Exact (case-insensitive) alias lookup, used by the click triggers. */
+    public static java.util.Optional<PlayerContext> lookup(
+            String alias
+    ) {
+
+        if (alias == null || alias.isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        return java.util.Optional.ofNullable(
+                ALIASES.get(alias.trim().toLowerCase())
+        );
+    }
+
     /** Finds learned alias occurrences in arbitrary text. */
     public static List<PlayerMention> detect(String message) {
-
         List<PlayerMention> result = new ArrayList<>();
 
         if (message == null || message.isBlank()) {

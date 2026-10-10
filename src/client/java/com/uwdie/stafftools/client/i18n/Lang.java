@@ -5,6 +5,7 @@ import net.minecraft.text.Text;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Lightweight localization for the mod.
@@ -57,6 +58,22 @@ public final class Lang {
         public static final String BTN_ON = "btn.on";
         public static final String BTN_OFF = "btn.off";
         public static final String BTN_THEMES = "btn.themes";
+        public static final String BTN_DETECTION = "btn.detection";
+        public static final String BTN_PROFILES = "btn.profiles";
+
+        // Titles / hints
+        public static final String TITLE_DETECTION = "title.detection";
+        public static final String TITLE_PROFILES = "title.profiles";
+        public static final String TITLE_PROFILE_EDIT = "title.profileEdit";
+        public static final String TITLE_PROFILE_IMPORT = "title.profileImport";
+        public static final String MSG_DETECT_HINT = "msg.detectHint";
+        public static final String MSG_DETECT_EMPTY = "msg.detectEmpty";
+        public static final String MSG_PROFILES_HINT = "msg.profilesHint";
+        public static final String MSG_PROFILES_EMPTY = "msg.profilesEmpty";
+        public static final String MSG_PROFILE_MACROS = "msg.profileMacros";
+        public static final String MSG_PROFILE_ACTIONS = "msg.profileActions";
+        public static final String MSG_PROFILE_NONE = "msg.profileNone";
+        public static final String MSG_PROFILE_ACTIVE = "msg.profileActive";
 
         // Themes
         public static final String THEME_OCEAN = "theme.ocean";
@@ -81,6 +98,28 @@ public final class Lang {
         public static final String TOGGLE_CHAT_INPUT = "toggle.chatInput";
         public static final String TOGGLE_SAVE_POPUP_SIZE =
                 "toggle.savePopupSize";
+
+        // Detection methods (all shown in the detection settings)
+        public static final String TOGGLE_DETECT_PLAIN =
+                "toggle.detectPlain";
+        public static final String TOGGLE_DETECT_DISPLAY =
+                "toggle.detectDisplay";
+        public static final String TOGGLE_DETECT_CLICK =
+                "toggle.detectClick";
+        public static final String TOGGLE_DETECT_HOVER =
+                "toggle.detectHover";
+        public static final String TOGGLE_DETECT_ALIASES =
+                "toggle.detectAliases";
+        public static final String TOGGLE_DETECT_UNICODE =
+                "toggle.detectUnicode";
+        public static final String TOGGLE_DETECT_DECOR =
+                "toggle.detectDecor";
+        public static final String TOGGLE_DETECT_LINE =
+                "toggle.detectLine";
+        public static final String TOGGLE_DETECT_CACHE =
+                "toggle.detectCache";
+        public static final String TOGGLE_DETECT_FUZZY =
+                "toggle.detectFuzzy";
 
         // Field labels
         public static final String LABEL_NAME = "label.name";
@@ -130,10 +169,47 @@ public final class Lang {
         public static final String HOVER_CLICK = "hover.click";
         public static final String HOVER_SHIFT_CLICK = "hover.shiftClick";
 
+        // profile actions
+        public static final String BTN_PROFILE_CREATE = "btn.profileCreate";
+        public static final String BTN_PROFILE_SAVE = "btn.profileSave";
+        public static final String BTN_PROFILE_APPLY = "btn.profileApply";
+        public static final String BTN_PROFILE_EXPORT = "btn.profileExport";
+        public static final String BTN_PROFILE_IMPORT = "btn.profileImport";
+        public static final String BTN_PROFILE_DELETE = "btn.profileDelete";
+        public static final String BTN_PROFILE_OPEN = "btn.profileOpen";
+        public static final String BTN_PROFILE_OPEN_FOLDER =
+                "btn.profileOpenFolder";
+        public static final String BTN_REFRESH = "btn.refresh";
+        public static final String LABEL_PROFILE_NAME = "label.profileName";
+        public static final String LABEL_PROFILE_THEME = "label.profileTheme";
+
+        public static final String MSG_PROFILE_NO_FILES =
+                "msg.profileNoFiles";
+        public static final String MSG_PROFILE_IMPORT_HINT =
+                "msg.profileImportHint";
+        public static final String MSG_PROFILE_FOLDER =
+                "msg.profileFolder";
+
         // Toasts
         public static final String TOAST_COPIED = "toast.copied";
         public static final String TOAST_DUP_CHAT = "toast.dupChat";
         public static final String TOAST_EXECUTED = "toast.executed";
+        public static final String TOAST_PROFILE_SAVED = "toast.profileSaved";
+        public static final String TOAST_PROFILE_APPLIED = "toast.profileApplied";
+        public static final String TOAST_PROFILE_CREATED = "toast.profileCreated";
+        public static final String TOAST_PROFILE_DELETED = "toast.profileDeleted";
+        public static final String TOAST_PROFILE_EXPORTED = "toast.profileExported";
+        public static final String TOAST_PROFILE_IMPORTED = "toast.profileImported";
+        public static final String TOAST_PROFILE_BAD_JSON =
+                "toast.profileBadJson";
+        public static final String TOAST_PROFILE_LAST =
+                "toast.profileLast";
+        public static final String TOAST_PROFILE_EXPORT_FAILED =
+                "toast.profileExportFailed";
+        public static final String TOAST_PROFILE_FOLDER_OPENED =
+                "toast.profileFolderOpened";
+        public static final String TOAST_THEME_CHANGED =
+                "toast.themeChanged";
 
         // Punishments
         public static final String HISTORY_TITLE = "history.title";
@@ -154,6 +230,63 @@ public final class Lang {
     }
 
     private static Language current = Language.RU;
+
+    /** Rotating tagline of the main menu (one is picked per open). */
+    private static final String[] TAGLINES_RU = {
+            "Ты снова здесь?",
+            "Чудесный день, не правда ли?",
+            "Сколько раз ты здесь был?",
+            "Ну привет",
+            "Как жизнь?",
+            "Опять работать",
+            "Ты был прав, это баг",
+            "Зуб даю, ты вернёшься",
+            "Здесь снова пахнет приключениями",
+            "Не бойся, я просто меню",
+            "С этого места всё началось",
+            "А помнишь первый раз?",
+            "Ты зашёл, а мир изменился",
+            "Время — иллюзия, меню — нет",
+            "Ого, кто это к нам пришёл",
+            "Кто-то явно скучал",
+            "Случайно или нарочно?",
+            "Привет, странник",
+            "Снова мы и снова ты",
+            "Давай без внезапных решений"
+    };
+
+    private static final String[] TAGLINES_EN = {
+            "You here again?",
+            "Lovely day, isn't it?",
+            "How many times have you been here?",
+            "Well, hello",
+            "How's life?",
+            "Back to work again",
+            "You were right, it is a bug",
+            "Bet you will be back",
+            "Smells like adventure in here",
+            "Don't worry, I am just a menu",
+            "This is where it all began",
+            "Remember the first time?",
+            "You came, the world changed",
+            "Time is an illusion, menus are not",
+            "Look who is here",
+            "Somebody clearly missed this place",
+            "On purpose or by accident?",
+            "Hello, wanderer",
+            "Me again, you again",
+            "Let us keep sudden decisions low"
+    };
+
+    /** Random slogan for the menu header. */
+    public static String tagline() {
+
+        String[] pool = current == Language.RU
+                ? TAGLINES_RU
+                : TAGLINES_EN;
+
+        return pool[ThreadLocalRandom.current().nextInt(pool.length)];
+    }
 
     private static final Map<Language, Map<String, String>> TEXTS =
             new HashMap<>();
@@ -184,6 +317,23 @@ public final class Lang {
         ru.put(Key.BTN_ON, "Вкл");
         ru.put(Key.BTN_OFF, "Выкл");
         ru.put(Key.BTN_THEMES, "Темы");
+        ru.put(Key.BTN_DETECTION, "Детект ника");
+        ru.put(Key.BTN_PROFILES, "Профили");
+
+        ru.put(Key.TITLE_DETECTION, "Детект ника игрока");
+        ru.put(Key.TITLE_PROFILES, "Профили");
+        ru.put(Key.TITLE_PROFILE_EDIT, "Редактор профиля");
+        ru.put(Key.TITLE_PROFILE_IMPORT, "Импорт профиля");
+        ru.put(Key.MSG_DETECT_HINT,
+                "Способы, которыми мод находит ник в чате");
+        ru.put(Key.MSG_DETECT_EMPTY, "Все способы выключены");
+        ru.put(Key.MSG_PROFILES_HINT,
+                "Отдельные наборы макросов, действий и настроек");
+        ru.put(Key.MSG_PROFILES_EMPTY, "Профилей пока нет");
+        ru.put(Key.MSG_PROFILE_MACROS, "Макросы");
+        ru.put(Key.MSG_PROFILE_ACTIONS, "Действия");
+        ru.put(Key.MSG_PROFILE_NONE, "пусто");
+        ru.put(Key.MSG_PROFILE_ACTIVE, "активен");
 
         ru.put(Key.THEME_OCEAN, "Океан");
         ru.put(Key.THEME_EMERALD, "Изумруд");
@@ -205,6 +355,17 @@ public final class Lang {
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
         ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
+
+        ru.put(Key.TOGGLE_DETECT_PLAIN, "Ник в тексте сообщения");
+        ru.put(Key.TOGGLE_DETECT_DISPLAY, "Отображаемое имя (TAB)");
+        ru.put(Key.TOGGLE_DETECT_CLICK, "Клик-событие команды");
+        ru.put(Key.TOGGLE_DETECT_HOVER, "Текст при наведении");
+        ru.put(Key.TOGGLE_DETECT_ALIASES, "Выученные алиасы");
+        ru.put(Key.TOGGLE_DETECT_UNICODE, "Юникод-замена (AV A)");
+        ru.put(Key.TOGGLE_DETECT_DECOR, "Знаки вокруг ника");
+        ru.put(Key.TOGGLE_DETECT_LINE, "Клик по нику в чате");
+        ru.put(Key.TOGGLE_DETECT_CACHE, "Кэш видевших ников");
+        ru.put(Key.TOGGLE_DETECT_FUZZY, "Поиск с опечатками");
 
         ru.put(Key.LABEL_NAME, "Название");
         ru.put(Key.LABEL_DESCRIPTION, "Описание");
@@ -276,9 +437,36 @@ public final class Lang {
         ru.put(Key.PUN_PLAYER, "Игрок: %s");
         ru.put(Key.PUN_NO_RESPONSE_TEXT, "Ответ сервера не получен");
 
+        ru.put(Key.BTN_PROFILE_CREATE, "Создать");
+        ru.put(Key.BTN_PROFILE_SAVE, "Сохранить");
+        ru.put(Key.BTN_PROFILE_APPLY, "Применить");
+        ru.put(Key.BTN_PROFILE_EXPORT, "Экспорт");
+        ru.put(Key.BTN_PROFILE_IMPORT, "Импорт");
+        ru.put(Key.BTN_PROFILE_DELETE, "Удал");
+        ru.put(Key.BTN_PROFILE_OPEN, "Открыть");
+        ru.put(Key.LABEL_PROFILE_NAME, "Название профиля");
+        ru.put(Key.LABEL_PROFILE_THEME, "Тема профиля");
+
+        ru.put(Key.BTN_PROFILE_OPEN_FOLDER, "Открыть папку");
+        ru.put(Key.BTN_REFRESH, "Обновить");
+        ru.put(Key.MSG_PROFILE_NO_FILES, "В папке пока нет профилей");
+        ru.put(Key.MSG_PROFILE_IMPORT_HINT,
+                "Выберите файл профиля из папки");
+        ru.put(Key.MSG_PROFILE_FOLDER, "Папка профилей: %s");
+        ru.put(Key.TOAST_PROFILE_EXPORT_FAILED, "Не удалось сохранить файл");
+        ru.put(Key.TOAST_PROFILE_FOLDER_OPENED, "Папка профилей открыта");
         ru.put(Key.TOAST_COPIED, "Скопировано: %s");
         ru.put(Key.TOAST_DUP_CHAT, "Добавлено в чат: %s");
         ru.put(Key.TOAST_EXECUTED, "Выполнено: %s");
+        ru.put(Key.TOAST_PROFILE_SAVED, "Профиль сохранён: %s");
+        ru.put(Key.TOAST_PROFILE_APPLIED, "Профиль применён: %s");
+        ru.put(Key.TOAST_PROFILE_CREATED, "Профиль создан: %s");
+        ru.put(Key.TOAST_PROFILE_DELETED, "Профиль удалён: %s");
+        ru.put(Key.TOAST_PROFILE_EXPORTED, "Профиль сохранён: %s");
+        ru.put(Key.TOAST_PROFILE_IMPORTED, "Профиль импортирован: %s");
+        ru.put(Key.TOAST_PROFILE_BAD_JSON, "Не удалось разобрать профиль");
+        ru.put(Key.TOAST_PROFILE_LAST, "Нельзя удалить последний профиль");
+        ru.put(Key.TOAST_THEME_CHANGED, "Тема: %s");
 
         Map<String, String> en = new HashMap<>();
         en.put(Key.APP_TITLE, "StaffTools");
@@ -302,6 +490,23 @@ public final class Lang {
         en.put(Key.BTN_ON, "On");
         en.put(Key.BTN_OFF, "Off");
         en.put(Key.BTN_THEMES, "Themes");
+        en.put(Key.BTN_DETECTION, "Nick detection");
+        en.put(Key.BTN_PROFILES, "Profiles");
+
+        en.put(Key.TITLE_DETECTION, "Nick detection");
+        en.put(Key.TITLE_PROFILES, "Profiles");
+        en.put(Key.TITLE_PROFILE_EDIT, "Profile editor");
+        en.put(Key.TITLE_PROFILE_IMPORT, "Import profile");
+        en.put(Key.MSG_DETECT_HINT,
+                "How the mod finds the nick in chat");
+        en.put(Key.MSG_DETECT_EMPTY, "All methods are disabled");
+        en.put(Key.MSG_PROFILES_HINT,
+                "Separate sets of macros, actions and settings");
+        en.put(Key.MSG_PROFILES_EMPTY, "No profiles yet");
+        en.put(Key.MSG_PROFILE_MACROS, "Macros");
+        en.put(Key.MSG_PROFILE_ACTIONS, "Actions");
+        en.put(Key.MSG_PROFILE_NONE, "empty");
+        en.put(Key.MSG_PROFILE_ACTIVE, "active");
 
         en.put(Key.THEME_OCEAN, "Ocean");
         en.put(Key.THEME_EMERALD, "Emerald");
@@ -323,6 +528,17 @@ public final class Lang {
         en.put(Key.TOGGLE_TOASTS, "Notifications");
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
         en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
+
+        en.put(Key.TOGGLE_DETECT_PLAIN, "Nick in message text");
+        en.put(Key.TOGGLE_DETECT_DISPLAY, "Tab-list display name");
+        en.put(Key.TOGGLE_DETECT_CLICK, "Command click event");
+        en.put(Key.TOGGLE_DETECT_HOVER, "Hover tooltip text");
+        en.put(Key.TOGGLE_DETECT_ALIASES, "Learned aliases");
+        en.put(Key.TOGGLE_DETECT_UNICODE, "Unicode lookup (AV A)");
+        en.put(Key.TOGGLE_DETECT_DECOR, "Signs around the nick");
+        en.put(Key.TOGGLE_DETECT_LINE, "Click a nick in chat");
+        en.put(Key.TOGGLE_DETECT_CACHE, "Cache of seen nicks");
+        en.put(Key.TOGGLE_DETECT_FUZZY, "Typo-tolerant search");
 
         en.put(Key.LABEL_NAME, "Name");
         en.put(Key.LABEL_DESCRIPTION, "Description");
@@ -394,9 +610,36 @@ public final class Lang {
         en.put(Key.PUN_PLAYER, "Player: %s");
         en.put(Key.PUN_NO_RESPONSE_TEXT, "No server response received");
 
+        en.put(Key.BTN_PROFILE_CREATE, "Create");
+        en.put(Key.BTN_PROFILE_SAVE, "Save");
+        en.put(Key.BTN_PROFILE_APPLY, "Apply");
+        en.put(Key.BTN_PROFILE_EXPORT, "Export");
+        en.put(Key.BTN_PROFILE_IMPORT, "Import");
+        en.put(Key.BTN_PROFILE_DELETE, "Del");
+        en.put(Key.BTN_PROFILE_OPEN, "Open");
+        en.put(Key.LABEL_PROFILE_NAME, "Profile name");
+        en.put(Key.LABEL_PROFILE_THEME, "Profile theme");
+
+        en.put(Key.BTN_PROFILE_OPEN_FOLDER, "Open folder");
+        en.put(Key.BTN_REFRESH, "Refresh");
+        en.put(Key.MSG_PROFILE_NO_FILES, "No profile files yet");
+        en.put(Key.MSG_PROFILE_IMPORT_HINT,
+                "Pick a profile file from the folder");
+        en.put(Key.MSG_PROFILE_FOLDER, "Profile folder: %s");
+        en.put(Key.TOAST_PROFILE_EXPORT_FAILED, "Could not write the file");
+        en.put(Key.TOAST_PROFILE_FOLDER_OPENED, "Profile folder opened");
         en.put(Key.TOAST_COPIED, "Copied: %s");
         en.put(Key.TOAST_DUP_CHAT, "Inserted into chat: %s");
         en.put(Key.TOAST_EXECUTED, "Executed: %s");
+        en.put(Key.TOAST_PROFILE_SAVED, "Profile saved: %s");
+        en.put(Key.TOAST_PROFILE_APPLIED, "Profile applied: %s");
+        en.put(Key.TOAST_PROFILE_CREATED, "Profile created: %s");
+        en.put(Key.TOAST_PROFILE_DELETED, "Profile deleted: %s");
+        en.put(Key.TOAST_PROFILE_EXPORTED, "Profile saved: %s");
+        en.put(Key.TOAST_PROFILE_IMPORTED, "Profile imported: %s");
+        en.put(Key.TOAST_PROFILE_BAD_JSON, "Could not parse the profile");
+        en.put(Key.TOAST_PROFILE_LAST, "Cannot delete the last profile");
+        en.put(Key.TOAST_THEME_CHANGED, "Theme: %s");
 
         TEXTS.put(Language.RU, ru);
         TEXTS.put(Language.EN, en);

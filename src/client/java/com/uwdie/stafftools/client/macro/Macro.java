@@ -112,5 +112,23 @@ public class Macro {
                 confirmationRequired;
     }
 
+    /** Independent duplicate — used when copying profiles. */
+    public Macro copy() {
+
+        Macro clone = new Macro(
+                UUID.randomUUID(),
+                name,
+                description,
+                commands
+        );
+
+        clone.aliases = new ArrayList<>(aliases);
+        clone.enabled = enabled;
+        clone.dangerous = dangerous;
+        clone.confirmationRequired = confirmationRequired;
+
+        return clone;
+    }
+
 }
 

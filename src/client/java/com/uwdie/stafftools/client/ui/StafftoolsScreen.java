@@ -18,11 +18,17 @@ public class StafftoolsScreen extends StScreen {
 
     private static final int COL_W = 220;
     private static final int WIDGET_H = 20;
-    private static final int ROW_STEP = 24;
+    private static final int ROW_STEP = 22;
+
+    private static final int LOGO_Y = 54;
+    private static final int TAGLINE_Y = 74;
 
     private int colX;
     private int contentTop;
     private int panelBottom;
+
+    /** One random slogan per screen instance. */
+    private final String tagline = Lang.tagline();
 
     private final int logoVariant =
             java.util.concurrent.ThreadLocalRandom
@@ -54,6 +60,9 @@ public class StafftoolsScreen extends StScreen {
         addNavButton(row++, "🕘 ", Key.BTN_HISTORY, () ->
                 client.setScreen(new ActionHistoryScreen(this)));
 
+        addNavButton(row++, "\uD83D\uDC64 ", Key.BTN_PROFILES, () ->
+                client.setScreen(new ProfilesScreen(this)));
+
         row++;
 
         StaffToolsConfig config =
@@ -80,13 +89,6 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
-        addToggle(row++, Key.TOGGLE_CHAT_INPUT,
-                config.isChatInputDetectEnabled(),
-                v -> {
-                    config.setChatInputDetectEnabled(v);
-                    StafftoolsClient.saveConfig();
-                });
-
         addToggle(row++, Key.TOGGLE_SAVE_POPUP_SIZE,
                 config.isSavePopupSize(),
                 v -> {
@@ -106,14 +108,30 @@ public class StafftoolsScreen extends StScreen {
         panelBottom =
                 contentTop + (row + 1) * ROW_STEP + 6 + WIDGET_H + 10;
 
-        // themes picker — bottom-right corner of the SCREEN
+        // bottom-right corner: nick-detection settings + themes picker
+        addDrawableChild(
+                new StButton(
+                        width - 190,
+                        height - 28,
+                        88,
+                        20,
+                        Text.literal("\uD83D\uDD0D ")
+                                .append(Lang.text(Key.BTN_DETECTION)),
+                        b -> client.setScreen(
+                                new DetectionSettingsScreen(this)
+                        ),
+                        nextSlot(),
+                        Ui.ACCENT
+                )
+        );
+
         addDrawableChild(
                 new StButton(
                         width - 96,
                         height - 28,
                         88,
                         20,
-                        Text.literal("🎨 ")
+                        Text.literal("\uD83C\uDFA8 ")
                                 .append(Lang.text(Key.BTN_THEMES)),
                         b -> client.setScreen(new ThemesScreen()),
                         nextSlot(),
@@ -180,13 +198,24 @@ public class StafftoolsScreen extends StScreen {
                 alpha
         );
 
-        drawLogo(context, width / 2, 58, alpha);
+        // animated overlay frame, synced with the live theme
+        Ui.drawOrbitFrame(
+                context,
+                formLeft(),
+                34,
+                formWidth(),
+                panelBottom - 34,
+                alpha
+        );
 
+        drawLogo(context, width / 2, LOGO_Y, alpha);
+
+        // a fresh slogan on every visit
         context.drawCenteredTextWithShadow(
                 textRenderer,
-                Lang.text(Key.APP_TAGLINE),
+                Text.literal(tagline),
                 width / 2,
-                76,
+                TAGLINE_Y,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
         );
 
@@ -206,35 +235,41 @@ public class StafftoolsScreen extends StScreen {
                         (alpha - 0.55f) / 0.45f
                 );
 
+        // above the nav column ("before Макросы")
+        int line1Y = contentTop - 8;
+
         if (line1A > 0.01f) {
 
             context.fill(
                     colX,
-                    contentTop - 8,
+                    line1Y,
                     colX + COL_W,
-                    contentTop - 7,
+                    line1Y + 1,
                     Ui.argb(0xFF2C3B55, line1A)
             );
 
             drawShimmerLine(
                     context, now,
-                    contentTop - 8, line1A
+                    line1Y, line1A
             );
         }
+
+        // right below the last nav row ("after Профили")
+        int line2Y = contentTop + 6 * ROW_STEP;
 
         if (line2A > 0.01f) {
 
             context.fill(
                     colX,
-                    contentTop + 4 * ROW_STEP,
+                    line2Y,
                     colX + COL_W,
-                    contentTop + 4 * ROW_STEP + 1,
+                    line2Y + 1,
                     Ui.argb(0xFF2C3B55, line2A)
             );
 
             drawShimmerLine(
                     context, now + 1600,
-                    contentTop + 4 * ROW_STEP, line2A
+                    line2Y, line2A
             );
         }
     }

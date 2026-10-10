@@ -146,4 +146,22 @@ public class ActionEntry {
                         ? new ArrayList<>(aliases)
                         : new ArrayList<>();
     }
+
+    /** Independent duplicate — used when copying profiles. */
+    public ActionEntry copy() {
+
+        ActionEntry clone = new ActionEntry(
+                icon,
+                label,
+                command,
+                copyName,
+                enabled,
+                dangerous,
+                confirmationRequired
+        );
+
+        clone.aliases = new ArrayList<>(aliases);
+
+        return clone;
+    }
 }

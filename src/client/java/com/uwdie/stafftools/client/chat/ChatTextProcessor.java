@@ -1,5 +1,6 @@
 package com.uwdie.stafftools.client.chat;
 
+import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
@@ -48,7 +49,73 @@ public final class ChatTextProcessor {
         if (message == null) {
             return null;
         }
+
+        // every incoming message is a chance to learn a nick: the tab
+        // list may be empty while the chat still mentions the player
+        if (StafftoolsClient.getConfig().isDetectCache()) {
+            NickCache.get().refreshFromTabList();
+        }
+
         return processNode(message);
+    }
+
+    /**
+     * Resolves exactly ONE nick from an arbitrary piece of text using
+     * every enabled layer — this is what the "click a nick in chat"
+     * and "nick from the input field" triggers use.
+     */
+    public static PlayerContext resolveAny(String text) {
+
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+
+        String word = text.trim();
+
+        com.uwdie.stafftools.client.config.StaffToolsConfig config =
+                StafftoolsClient.getConfig();
+
+        // 1. the word itself is a (possibly nick-suffixed) token
+        if (config.isDetectCache()) {
+
+            PlayerContext cached =
+                    NickCache.get().resolve(word)
+                            .orElse(null);
+
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        // 2. learned aliases: a plugin's custom display name
+        if (config.isDetectAliases()) {
+
+            PlayerContext alias =
+                    NickAliases.lookup(word)
+                            .orElse(null);
+
+            if (alias != null) {
+                return alias;
+            }
+        }
+
+        // 3. full detection over the word
+        List<PlayerMention> mentions =
+                PlayerMentionDetector.detect(word);
+
+        if (!mentions.isEmpty()) {
+            return mentions.get(0).player();
+        }
+
+        // 4. typo-tolerant, only when explicitly enabled
+        if (config.isDetectFuzzy()) {
+
+            return NickCache.get()
+                    .resolveFuzzy(word)
+                    .orElse(null);
+        }
+
+        return null;
     }
 
     /**
@@ -111,9 +178,13 @@ public final class ChatTextProcessor {
         Style style = node.getStyle();
 
         PlayerContext eventPlayer =
-                resolveFromEvents(style);
+                StafftoolsClient.getConfig().isDetectClick()
+                        ? resolveFromEvents(style)
+                        : null;
 
         if (eventPlayer != null) {
+
+            NickCache.get().remember(eventPlayer);
 
             NickAliases.learn(
                     node.getString(),
@@ -141,13 +212,17 @@ public final class ChatTextProcessor {
             if (mentions.isEmpty()) {
 
                 PlayerContext byDisplayName =
-                        PlayerResolver
-                                .resolveByDisplayName(string)
-                                .orElse(null);
+                        StafftoolsClient.getConfig().isDetectDisplay()
+                                ? PlayerResolver
+                                        .resolveByDisplayName(string)
+                                        .orElse(null)
+                                : null;
 
                 if (byDisplayName == null) {
                     return node;
                 }
+
+                NickCache.get().remember(byDisplayName);
 
                 NickAliases.learn(string, byDisplayName);
 
@@ -245,6 +320,10 @@ public final class ChatTextProcessor {
             if (fromCommand != null) {
                 return fromCommand;
             }
+        }
+
+        if (!StafftoolsClient.getConfig().isDetectHover()) {
+            return null;
         }
 
         HoverEvent hover = style.getHoverEvent();

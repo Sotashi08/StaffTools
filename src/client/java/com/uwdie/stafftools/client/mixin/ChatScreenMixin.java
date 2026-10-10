@@ -1,6 +1,10 @@
 package com.uwdie.stafftools.client.mixin;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
+import com.uwdie.stafftools.client.chat.ChatLinePicker;
+import com.uwdie.stafftools.client.chat.ChatTextProcessor;
+import com.uwdie.stafftools.client.i18n.Lang;
+import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
@@ -8,6 +12,7 @@ import com.uwdie.stafftools.client.ui.Toasts;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
@@ -64,6 +69,7 @@ public class ChatScreenMixin {
             return;
         }
 
+        // the popup sits ON TOP of the chat: it must get the click first
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 PlayerActionOverlay.INSTANCE.mouseClicked(
                         mouseX,
@@ -71,6 +77,13 @@ public class ChatScreenMixin {
                         button
                 )) {
 
+            cir.setReturnValue(true);
+            return;
+        }
+
+        // NEW: click on a nick inside a rendered chat line — works even
+        // when the server did not attach any click event to it
+        if (tryChatLineDetect(mouseX, mouseY)) {
             cir.setReturnValue(true);
         }
     }
@@ -131,7 +144,6 @@ public class ChatScreenMixin {
             double mouseX,
             double mouseY
     ) {
-
         MinecraftClient client =
                 MinecraftClient.getInstance();
 
@@ -230,8 +242,61 @@ public class ChatScreenMixin {
             }
         }
 
+        // last chance: every other enabled detection layer
+        // (cache, aliases, fuzzy, ...)
+        if (resolved == null) {
+            resolved = ChatTextProcessor.resolveAny(token);
+        }
+
         if (resolved == null) {
             return false;
+        }
+
+        PlayerActionOverlay.INSTANCE.open(resolved);
+
+        return true;
+    }
+
+    /**
+     * Click on a nick inside a rendered chat line: the word under the
+     * cursor is resolved through every enabled detection layer, so the
+     * popup opens even when the server did not style the nick.
+     */
+    private boolean tryChatLineDetect(
+            double mouseX,
+            double mouseY
+    ) {
+
+        if (!StafftoolsClient.getConfig().isDetectLine()) {
+            return false;
+        }
+
+        String word = ChatLinePicker.wordAt(mouseX, mouseY);
+
+        if (word == null || word.length() < 3) {
+            return false;
+        }
+
+        PlayerContext resolved =
+                ChatTextProcessor.resolveAny(word);
+
+        if (resolved == null) {
+            return false;
+        }
+
+        // shift keeps the old behaviour: copy the nick instead of
+        // opening the actions popup
+        if (Screen.hasShiftDown() &&
+                StafftoolsClient.getConfig().isClickToCopyEnabled()) {
+
+            MinecraftClient.getInstance().keyboard
+                    .setClipboard(resolved.name());
+
+            Toasts.INSTANCE.success(
+                    Lang.t(Lang.Key.TOAST_COPIED, resolved.name())
+            );
+
+            return true;
         }
 
         PlayerActionOverlay.INSTANCE.open(resolved);

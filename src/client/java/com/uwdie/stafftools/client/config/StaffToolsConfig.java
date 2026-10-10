@@ -30,6 +30,21 @@ public class StaffToolsConfig {
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
+    // nick detection methods (see DetectionSettingsScreen)
+    private boolean detectPlain = true;
+    private boolean detectDisplay = true;
+    private boolean detectClick = true;
+    private boolean detectHover = true;
+    private boolean detectAliases = true;
+    private boolean detectUnicode = true;
+    private boolean detectDecor = true;
+    private boolean detectLine = true;
+    private boolean detectCache = true;
+    private boolean detectFuzzy = false;
+
+    private List<Profile> profiles = new ArrayList<>();
+    private String activeProfileId = "";
+
     private int themeIndex = 0;
 
     private boolean chatInputDetectEnabled = true;
@@ -120,6 +135,86 @@ public class StaffToolsConfig {
         );
     }
 
+    public boolean isDetectPlain() {
+        return detectPlain;
+    }
+
+    public void setDetectPlain(boolean value) {
+        this.detectPlain = value;
+    }
+
+    public boolean isDetectDisplay() {
+        return detectDisplay;
+    }
+
+    public void setDetectDisplay(boolean value) {
+        this.detectDisplay = value;
+    }
+
+    public boolean isDetectClick() {
+        return detectClick;
+    }
+
+    public void setDetectClick(boolean value) {
+        this.detectClick = value;
+    }
+
+    public boolean isDetectHover() {
+        return detectHover;
+    }
+
+    public void setDetectHover(boolean value) {
+        this.detectHover = value;
+    }
+
+    public boolean isDetectAliases() {
+        return detectAliases;
+    }
+
+    public void setDetectAliases(boolean value) {
+        this.detectAliases = value;
+    }
+
+    public boolean isDetectUnicode() {
+        return detectUnicode;
+    }
+
+    public void setDetectUnicode(boolean value) {
+        this.detectUnicode = value;
+    }
+
+    public boolean isDetectDecor() {
+        return detectDecor;
+    }
+
+    public void setDetectDecor(boolean value) {
+        this.detectDecor = value;
+    }
+
+    public boolean isDetectLine() {
+        return detectLine;
+    }
+
+    public void setDetectLine(boolean value) {
+        this.detectLine = value;
+    }
+
+    public boolean isDetectCache() {
+        return detectCache;
+    }
+
+    public void setDetectCache(boolean value) {
+        this.detectCache = value;
+    }
+
+    public boolean isDetectFuzzy() {
+        return detectFuzzy;
+    }
+
+    public void setDetectFuzzy(boolean value) {
+        this.detectFuzzy = value;
+    }
+
     public boolean isToastsEnabled() {
         return toastsEnabled;
     }
@@ -167,5 +262,161 @@ public class StaffToolsConfig {
 
     public void setActionEntries(List<ActionEntry> actionEntries) {
         this.actionEntries = actionEntries != null ? actionEntries : new ArrayList<>();
+    }
+
+    // ---------------------------------------------------------------
+    // profiles
+    // ---------------------------------------------------------------
+
+    /** All saved profiles (never null, may be empty until first use). */
+    public List<Profile> getProfiles() {
+        return profiles != null ? profiles : new ArrayList<>();
+    }
+
+    public void setProfiles(List<Profile> value) {
+        this.profiles = value != null ? value : new ArrayList<>();
+    }
+
+    /**
+     * The profile the live settings currently mirror. Created lazily
+     * from the current settings, so an old config file keeps working.
+     */
+    public Profile getActiveProfile() {
+
+        for (Profile profile : getProfiles()) {
+
+            if (profile.getId().equals(activeProfileId)) {
+                return profile;
+            }
+        }
+
+        if (getProfiles().isEmpty()) {
+            return createProfile(defaultProfileName());
+        }
+
+        // stale id: fall back to the first profile
+        Profile first = getProfiles().get(0);
+
+        this.activeProfileId = first.getId();
+
+        return first;
+    }
+
+    private String defaultProfileName() {
+        return "Profile " + (getProfiles().size() + 1);
+    }
+
+    /**
+     * Snapshots the current live settings + macros + actions into a new
+     * profile and activates it.
+     */
+    public Profile createProfile(String name) {
+
+        Profile profile = new Profile();
+
+        profile.setName(
+                name == null || name.isBlank()
+                        ? defaultProfileName()
+                        : name
+        );
+
+        profile.capture(this);
+
+        getProfiles().add(profile);
+
+        this.activeProfileId = profile.getId();
+
+        return profile;
+    }
+
+    /** Writes the live settings back into the active profile. */
+    public void saveActiveProfile() {
+        getActiveProfile().capture(this);
+    }
+
+    /**
+     * Activates another profile: the live settings are overwritten by
+     * its snapshot. Returns false when the id is unknown.
+     */
+    public boolean switchProfile(String id) {
+
+        Profile target = null;
+
+        for (Profile profile : getProfiles()) {
+
+            if (profile.getId().equals(id)) {
+                target = profile;
+                break;
+            }
+        }
+
+        if (target == null) {
+            return false;
+        }
+
+        target.restore(this);
+
+        this.activeProfileId = target.getId();
+
+        return true;
+    }
+
+    /** Removes a profile; the last one can never be deleted. */
+    public boolean deleteProfile(String id) {
+
+        if (getProfiles().size() <= 1) {
+            return false;
+        }
+
+        boolean removed =
+                getProfiles().removeIf(
+                        profile -> profile.getId().equals(id)
+                );
+
+        if (removed &&
+                id.equals(activeProfileId)) {
+
+            Profile next = getProfiles().get(0);
+
+            next.restore(this);
+
+            activeProfileId = next.getId();
+        }
+
+        return removed;
+    }
+
+    public boolean renameProfile(String id, String name) {
+
+        for (Profile profile : getProfiles()) {
+
+            if (profile.getId().equals(id)) {
+
+                profile.setName(name);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public Profile findProfile(String id) {
+
+        for (Profile profile : getProfiles()) {
+
+            if (profile.getId().equals(id)) {
+                return profile;
+            }
+        }
+
+        return null;
+    }
+
+    public String getActiveProfileId() {
+        return activeProfileId;
+    }
+
+    public void setActiveProfileId(String id) {
+        this.activeProfileId = id != null ? id : "";
     }
 }

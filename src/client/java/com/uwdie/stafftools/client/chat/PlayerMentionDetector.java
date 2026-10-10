@@ -1,5 +1,7 @@
 package com.uwdie.stafftools.client.chat;
 
+import com.uwdie.stafftools.client.StafftoolsClient;
+import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 
@@ -7,12 +9,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Detects player mentions in a chat string.
+ * Detects player mentions inside a plain chat string.
  *
- * Layer 1: direct case-insensitive matching of tab-list names.
- * Layer 2: same matching after stripping legacy color codes (§a, §l, ...)
- *          which many chat plugins embed directly into the JSON text,
- *          breaking naive matching ("§aPl§fayer" -> "Player").
+ * Layers, in order (each one can be switched off in the detection menu):
+ * 1. real nicks from the tab list,
+ * 2. nicks from the local cache of everyone seen this session,
+ * 3. the same two after folding look-alike unicode
+ *    ("\u1D04ᴀᴘꜱ" -> "caps"),
+ * 4. the same two after replacing decorations with spaces
+ *    ("[VIP]Notch\u2605" -> " VIP Notch "),
+ * 5. the same two after stripping legacy colour codes
+ *    ("\u00A7aPl\u00A7fayer" -> "Player"),
+ * 6. aliases learned from click / hover events.
  */
 public final class PlayerMentionDetector {
 
@@ -27,11 +35,38 @@ public final class PlayerMentionDetector {
             return List.of();
         }
 
-        List<PlayerMention> mentions =
-                findIn(message);
+        StaffToolsConfig config =
+                StafftoolsClient.getConfig();
+
+        List<PlayerMention> mentions = findIn(message);
 
         if (!mentions.isEmpty()) {
             return mentions;
+        }
+
+        if (config.isDetectUnicode()) {
+
+            String folded = TextNormalizer.unicodeFold(message);
+
+            if (!folded.equals(message)) {
+
+                mentions = findIn(folded);
+
+                if (!mentions.isEmpty()) {
+                    return mentions;
+                }
+            }
+        }
+
+        if (config.isDetectDecor()) {
+
+            mentions = findIn(
+                    TextNormalizer.decorationFold(message)
+            );
+
+            if (!mentions.isEmpty()) {
+                return mentions;
+            }
         }
 
         mentions = detectStripped(message);
@@ -40,9 +75,14 @@ public final class PlayerMentionDetector {
             return mentions;
         }
 
-        return NickAliases.detect(message);
+        if (config.isDetectAliases()) {
+            return NickAliases.detect(message);
+        }
+
+        return List.of();
     }
 
+    /** Tab list + local cache matching on the given string. */
     private static List<PlayerMention> findIn(
             String message
     ) {
@@ -50,12 +90,44 @@ public final class PlayerMentionDetector {
         List<PlayerMention> mentions =
                 new ArrayList<>();
 
-        for (PlayerContext player :
-                PlayerResolver.findPlayers(message)) {
+        if (StafftoolsClient.getConfig().isDetectPlain()) {
+
+            mentions.addAll(
+                    rangesOf(
+                            message,
+                            PlayerResolver.findPlayers(message)
+                    )
+            );
+        }
+
+        if (mentions.isEmpty() &&
+                StafftoolsClient.getConfig().isDetectCache()) {
+
+            mentions.addAll(
+                    rangesOf(
+                            message,
+                            NickCache.get().findIn(message)
+                    )
+            );
+        }
+
+        return mentions;
+    }
+
+    /** Converts players into word-bounded mention ranges. */
+    private static List<PlayerMention> rangesOf(
+            String message,
+            List<PlayerContext> players
+    ) {
+
+        List<PlayerMention> mentions =
+                new ArrayList<>();
+
+        String lower = message.toLowerCase();
+
+        for (PlayerContext player : players) {
 
             String name = player.name();
-
-            String lower = message.toLowerCase();
             String target = name.toLowerCase();
 
             int index = lower.indexOf(target);
@@ -64,11 +136,15 @@ public final class PlayerMentionDetector {
 
                 boolean left =
                         index == 0 ||
-                                !isNameChar(lower.charAt(index - 1));
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(index - 1)
+                                );
 
                 boolean right =
                         index + target.length() >= lower.length() ||
-                                !isNameChar(lower.charAt(index + target.length()));
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(index + target.length())
+                                );
 
                 if (left && right) {
 
@@ -92,8 +168,8 @@ public final class PlayerMentionDetector {
     }
 
     /**
-     * Strips legacy formatting codes ("§x") from the message while keeping
-     * an index map back to the original string, then runs detection on the
+     * Strips legacy formatting codes ("§x") from the message while
+     * keeping the indices stable, then runs the normal detection on the
      * clean text and converts the resulting ranges back.
      */
     private static List<PlayerMention> detectStripped(
@@ -147,11 +223,5 @@ public final class PlayerMentionDetector {
         }
 
         return result;
-    }
-
-    private static boolean isNameChar(char c) {
-        return Character.isLetterOrDigit(c)
-                || c == '_'
-                || c == '\u00A7';
     }
 }
