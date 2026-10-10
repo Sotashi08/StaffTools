@@ -625,14 +625,14 @@ public final class Ui {
     }
 
     /**
-     * Animated overlay frame for the main menu: two smooth, high-contrast
+     * Animated overlay frame for the main menu: four smooth, high-contrast
      * bars orbiting the panel border clockwise.
      *
-     * Each bar is a theme gradient (tail -> accent, head -> near white)
-     * with feathered edges and a layered glow. Motion is sub-pixel smooth:
-     * a bar is not drawn as whole pixels but as half-pixel slices whose
-     * alpha is averaged over two taps inside their own width, so nothing
-     * steps and both ends read as feathered instead of cut.
+     * Each bar is a theme gradient that is darkest at both ends and
+     * brightest at its centre — {@code ___---====---___} — with feathered
+     * edges and a layered glow. Motion is sub-pixel smooth: a bar is not
+     * drawn as whole pixels but as half-pixel slices, so nothing steps
+     * and both ends read as feathered instead of cut.
      * Colours are read live from the theme, so a theme switch applies on
      * the very next frame.
      */
@@ -683,11 +683,11 @@ public final class Ui {
 
         float phaseT = (float) (phase * perimeter);
 
-        int bars = 2;
+        int bars = 4;
 
         int barLength = Math.max(
-                40,
-                Math.min(96, perimeter / 8)
+                48,
+                Math.min(150, perimeter / 6)
         );
 
         for (int i = 0; i < bars; i++) {
@@ -708,8 +708,9 @@ public final class Ui {
     }
 
     /**
-     * One bar: a smooth alpha envelope from the tail (dark, low alpha)
-     * to the head (near white, high alpha).
+     * One bar: an alpha envelope that is darkest at both ends and
+     * brightest in the middle, so the bar reads as
+     * {@code ___---====---___}.
      *
      * The bar is painted as half-pixel slices — two per screen pixel —
      * so the alpha of every slice is a genuine average over its own
@@ -736,15 +737,15 @@ public final class Ui {
 
         // tail colour: accent nudged towards white, so the bar stays
         // richer than the panel edge instead of a flat grey line
-        int cold = mix(ACCENT, TEXT, 0.12f);
+        int edge = mix(ACCENT, TEXT, 0.10f);
 
-        // head colour: accent brightened towards white — this is what
+        // centre colour: accent brightened towards white — this is what
         // makes the bar read brighter than the base theme colour
-        int head = mix(mix(ACCENT_2, TEXT, 0.55f), ACCENT, 0.25f);
+        int core = mix(mix(ACCENT_2, TEXT, 0.60f), ACCENT, 0.20f);
 
         // glow colour: a little dimmer, so the halo reads as light
         // bleeding out of the bar instead of a second bar
-        int glow = mix(cold, head, 0.55f);
+        int glow = mix(edge, core, 0.45f);
 
         int slices = length * 2;
 
@@ -753,7 +754,10 @@ public final class Ui {
             // 0 at the tail, 1 at the head
             float t = (i + 0.5f) / slices;
 
-            float a = barEnvelope(t);
+            // 0 at both ends of the bar, 1 at its centre
+            float m = 1f - Math.abs(t * 2f - 1f);
+
+            float a = barEnvelope(m);
 
             if (a <= 0.004f) {
                 continue;
@@ -765,7 +769,7 @@ public final class Ui {
             int p0 = Math.round(pos - 0.5f);
             int p1 = p0 + 1;
 
-            int rgb = mix(cold, head, easeOutCubic(t));
+            int rgb = mix(edge, core, smoothstep(0.10f, 0.85f, m));
 
             // wide soft halo, drawn under the core
             strokePerimeter(
@@ -784,7 +788,7 @@ public final class Ui {
                     top, side, perimeter,
                     p0, p1,
                     3,
-                    argb(rgb, alpha * a * 0.28f)
+                    argb(rgb, alpha * a * 0.30f)
             );
 
             // bright core
@@ -800,20 +804,21 @@ public final class Ui {
     }
 
     /**
-     * Brightness envelope along one bar: cubic ease-out from the tail,
-     * a bright plateau and a short feather at the head, so both ends are
-     * smoothed instead of cut.
+     * Brightness envelope along one bar, symmetric about its centre:
+     * a soft ramp up, a wide plateau and a soft ramp down, so both ends
+     * are feathered instead of cut.
      */
-    private static float barEnvelope(float t) {
+    private static float barEnvelope(float m) {
 
-        if (t <= 0f || t >= 1f) {
+        if (m <= 0f) {
             return 0f;
         }
 
-        float rise = easeOutCubic(t / 0.45f);
-        float fall = 1f - 0.35f * smoothstep(0.86f, 1f, t);
+        // ramp up from the edge ...
+        float up = smoothstep(0f, 0.42f, m);
 
-        return rise * fall;
+        // ... flatten into a plateau instead of a hard peak
+        return up * (1f - 0.12f * smoothstep(0.86f, 1f, m));
     }
 
     public static void drawHeader(
