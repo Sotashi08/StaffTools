@@ -96,6 +96,13 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
+        addToggle(row++, Key.TOGGLE_MENU_ANIMATION,
+                config.isMenuAnimation(),
+                v -> {
+                    config.setMenuAnimation(v);
+                    StafftoolsClient.saveConfig();
+                });
+
         button(
                 colX,
                 contentTop + row * ROW_STEP + 6,

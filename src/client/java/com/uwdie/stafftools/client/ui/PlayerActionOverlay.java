@@ -96,6 +96,7 @@ public final class PlayerActionOverlay {
     // alias selection modal state
     private boolean aliasOpen;
     private Macro aliasMacro;
+    private ActionEntry aliasEntry;
     private PlayerContext aliasTarget;
     private List<String> aliasList = new ArrayList<>();
     private int aliasScroll;
@@ -219,6 +220,7 @@ public final class PlayerActionOverlay {
 
         aliasOpen = false;
         aliasMacro = null;
+        aliasEntry = null;
         aliasTarget = null;
         aliasScroll = 0;
 
@@ -1525,16 +1527,35 @@ public final class PlayerActionOverlay {
 
                     String alias = aliasList.get(index);
 
-                    MacroExecutor.executeWithAlias(
-                            aliasMacro,
-                            aliasTarget,
-                            alias
-                    );
+                    // a macro keeps its name in the toast, an action
+                    // shows the action label instead
+                    if (aliasMacro != null) {
 
-                    Toasts.INSTANCE.success(
-                            Lang.t(Key.TOAST_EXECUTED,
-                                    aliasMacro.getName())
-                    );
+                        MacroExecutor.executeWithAlias(
+                                aliasMacro,
+                                aliasTarget,
+                                alias
+                        );
+
+                        Toasts.INSTANCE.success(
+                                Lang.t(Key.TOAST_EXECUTED,
+                                        aliasMacro.getName())
+                        );
+
+                    } else if (aliasEntry != null) {
+
+                        MacroExecutor.executeActionWithAlias(
+                                aliasEntry.getCommand(),
+                                aliasTarget,
+                                alias,
+                                aliasEntry.getLabel()
+                        );
+
+                        Toasts.INSTANCE.success(
+                                Lang.t(Key.TOAST_EXECUTED,
+                                        aliasEntry.getLabel())
+                        );
+                    }
                 }
             }
 
@@ -1844,19 +1865,41 @@ public final class PlayerActionOverlay {
      */
     private boolean execute(RowItem item) {
 
-        if (item.macro != null &&
-                MacroExecutor.requiresAlias(item.macro)) {
+        List<String> commands =
+                item.macro != null
+                        ? item.macro.getCommands()
+                        : item.commands;
 
-            List<String> aliases =
-                    item.macro.getAliases();
+        List<String> aliases =
+                item.macro != null
+                        ? item.macro.getAliases()
+                        : item.aliases();
 
+        boolean needsAlias =
+                MacroExecutor.requiresAlias(commands);
+
+        if (needsAlias) {
+
+            // no variants configured: substitute an empty alias
             if (aliases.isEmpty()) {
 
-                MacroExecutor.executeWithAlias(
-                        item.macro,
-                        player,
-                        ""
-                );
+                if (item.macro != null) {
+
+                    MacroExecutor.executeWithAlias(
+                            item.macro,
+                            player,
+                            ""
+                    );
+
+                } else {
+
+                    MacroExecutor.executeActionWithAlias(
+                            entryCommand(item),
+                            player,
+                            "",
+                            item.label
+                    );
+                }
 
                 flashItem = item;
                 flashTime = System.currentTimeMillis();
@@ -1869,7 +1912,9 @@ public final class PlayerActionOverlay {
                 return false;
             }
 
+            // let the user pick a variant first
             aliasMacro = item.macro;
+            aliasEntry = item.entry;
             aliasTarget = player;
             aliasList = new ArrayList<>(aliases);
             aliasScroll = 0;
@@ -1888,9 +1933,10 @@ public final class PlayerActionOverlay {
 
         } else {
 
-            MacroExecutor.executeCommands(
-                    item.commands,
-                    player
+            MacroExecutor.executeAction(
+                    entryCommand(item),
+                    player,
+                    item.label
             );
         }
 
@@ -1904,6 +1950,13 @@ public final class PlayerActionOverlay {
         return false;
     }
 
+    /** Command of an action row, never null. */
+    private static String entryCommand(RowItem item) {
+        return item.entry != null
+                ? item.entry.getCommand()
+                : "";
+    }
+
     private static final class RowItem {
 
         private String label;
@@ -1912,6 +1965,7 @@ public final class PlayerActionOverlay {
         private final boolean confirmationRequired;
         private boolean separator;
         private final Macro macro;
+        private final ActionEntry entry;
 
         private RowItem(ActionEntry entry) {
 
@@ -1931,6 +1985,7 @@ public final class PlayerActionOverlay {
 
             this.separator = false;
             this.macro = null;
+            this.entry = entry;
         }
 
         private RowItem(Macro macro) {
@@ -1943,6 +1998,19 @@ public final class PlayerActionOverlay {
 
             this.separator = false;
             this.macro = macro;
+            this.entry = null;
+        }
+
+        /** Alias variants to offer for this row. */
+        private List<String> aliases() {
+
+            if (macro != null) {
+                return macro.getAliases();
+            }
+
+            return entry == null
+                    ? List.of()
+                    : entry.getAliases();
         }
 
         private static RowItem separator(String text) {
@@ -1962,6 +2030,7 @@ public final class PlayerActionOverlay {
             this.confirmationRequired = false;
             this.separator = false;
             this.macro = null;
+            this.entry = null;
         }
     }
 

@@ -34,6 +34,19 @@ public final class PunishmentHistory {
     private final List<PunishmentRecord> records =
             new ArrayList<>();
 
+    /**
+     * Macro or action that is currently being executed, so every record
+     * its commands produce can name it. Kept alive for a short window: a
+     * macro may run several commands, and a name must never leak into an
+     * unrelated command typed much later.
+     */
+    private String pendingSource;
+    private PunishmentRecord.SourceKind pendingKind;
+    private long pendingMacroAt;
+
+    /** How long a macro name stays attached to the commands after it. */
+    private static final long MACRO_WINDOW_MS = 2_000L;
+
     private PunishmentHistory(Path path) {
         this.path = path;
     }
@@ -53,13 +66,89 @@ public final class PunishmentHistory {
         PunishmentRecord record =
                 CommandAnalyzer.analyze(command);
 
-        if (record == null) {
-            return;
+        if (record != null) {
+
+            // who issued it: the local player, since the command was
+            // sent by this client. Broadcast issuers are never used here.
+            MinecraftClient client =
+                    MinecraftClient.getInstance();
+
+            if (client.player != null) {
+
+                record.setModerator(
+                        client.player.getName().getString()
+                );
+            }
+
+            record.setSourceName(consumeSource());
+            record.setSourceKind(consumeKind());
+
+            records.add(0, record);
+            trim();
+            save();
         }
 
-        records.add(0, record);
-        trim();
-        save();
+        expireMacro();
+    }
+
+    /**
+     * Names the macro or action that is about to be executed, so the
+     * punishments its commands produce can reference it.
+     */
+    public void setPendingSource(
+            String sourceName,
+            PunishmentRecord.SourceKind sourceKind
+    ) {
+
+        this.pendingSource = sourceName;
+        this.pendingKind = sourceKind;
+        this.pendingMacroAt = System.currentTimeMillis();
+    }
+
+    /** The source name if it is still inside its window, else null. */
+    private String consumeSource() {
+
+        if (pendingSource == null) {
+            return null;
+        }
+
+        if (System.currentTimeMillis() - pendingMacroAt
+                > MACRO_WINDOW_MS) {
+
+            pendingSource = null;
+            return null;
+        }
+
+        return pendingSource;
+    }
+
+    /** Kind of the source that is still inside its window. */
+    private PunishmentRecord.SourceKind consumeKind() {
+
+        if (pendingSource == null) {
+            return PunishmentRecord.SourceKind.MANUAL;
+        }
+
+        if (System.currentTimeMillis() - pendingMacroAt
+                > MACRO_WINDOW_MS) {
+
+            return PunishmentRecord.SourceKind.MANUAL;
+        }
+
+        return pendingKind == null
+                ? PunishmentRecord.SourceKind.MANUAL
+                : pendingKind;
+    }
+
+    /** Drops a stale source name so it cannot tag later commands. */
+    private void expireMacro() {
+
+        if (pendingSource != null &&
+                System.currentTimeMillis() - pendingMacroAt
+                        > MACRO_WINDOW_MS) {
+
+            pendingSource = null;
+        }
     }
 
     /** Called for every chat message to try to match pending punishments. */
@@ -92,9 +181,14 @@ public final class PunishmentHistory {
         boolean foreignIssued =
                 issuer != null &&
                         selfName != null &&
-                        !issuer.equals(selfName);
+                        !CommandAnalyzer.sameName(issuer, selfName);
 
-        boolean changed = false;
+        // a rejection skips the nick test: "недостаточно прав" is often
+        // the whole reply
+        boolean failure = CommandAnalyzer.isFailure(lower);
+
+        PunishmentRecord best = null;
+        int bestScore = -1;
 
         for (PunishmentRecord record : records) {
 
@@ -113,34 +207,77 @@ public final class PunishmentHistory {
             String player =
                     record.getPlayerName();
 
-            if (player == null ||
-                    player.isBlank()) {
+            if (player != null &&
+                    !player.isBlank() &&
+                    CommandAnalyzer.containsName(lower, player)) {
+
+                // a nick match is the strongest signal there is
+                int score =
+                        100 + CommandAnalyzer.confirmationScore(
+                                lower,
+                                record.getType()
+                        );
+
+                if (score > bestScore) {
+                    best = record;
+                    bestScore = score;
+                }
 
                 continue;
             }
 
-            if (!lower.contains(
-                    CommandAnalyzer.normalize(player)
-            )) {
+            // fallback: no nick in the reply, but the reply quotes the
+            // command itself ("unban: недостаточно прав")
+            if (failure &&
+                    record.getType().mentionsOutcome(lower)) {
 
-                continue;
-            }
-
-            if (record.getType().matchesResponse(lower) ||
-                    CommandAnalyzer.isFailure(lower)) {
-
-                record.setStatus(
-                        PunishmentStatus.DONE
-                );
-
-                record.setResponse(message);
-                changed = true;
+                best = record;
+                bestScore = 50;
+                break;
             }
         }
 
-        if (changed) {
-            save();
+        if (best == null) {
+
+            if (!failure) {
+                return;
+            }
+
+            // nothing named at all: resolve the newest pending entry
+            for (PunishmentRecord record : records) {
+
+                if (record.getStatus() ==
+                        PunishmentStatus.PENDING) {
+
+                    best = record;
+                    break;
+                }
+            }
+
+            if (best == null) {
+                return;
+            }
         }
+
+        PunishmentStatus outcome =
+                failure
+                        ? PunishmentStatus.FAILED
+                        : CommandAnalyzer.resolveOutcome(
+                                lower,
+                                best.getType()
+                        );
+
+        if (outcome == null) {
+
+            // the reply is about this player but proves nothing: leave
+            // the entry pending, the timeout will handle it
+            return;
+        }
+
+        best.setStatus(outcome);
+        best.setResponse(message);
+
+        save();
     }
 
     public List<PunishmentRecord> getRecords() {

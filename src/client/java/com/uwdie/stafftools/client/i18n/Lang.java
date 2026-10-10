@@ -98,6 +98,8 @@ public final class Lang {
         public static final String TOGGLE_CHAT_INPUT = "toggle.chatInput";
         public static final String TOGGLE_SAVE_POPUP_SIZE =
                 "toggle.savePopupSize";
+        public static final String TOGGLE_MENU_ANIMATION =
+                "toggle.menuAnimation";
 
         // Detection methods (all shown in the detection settings)
         public static final String TOGGLE_DETECT_PLAIN =
@@ -222,11 +224,43 @@ public final class Lang {
         public static final String PUN_TYPE_WARN = "pun.type.warn";
         public static final String PUN_TYPE_FREEZE = "pun.type.freeze";
         public static final String PUN_TYPE_OTHER = "pun.type.other";
+        public static final String PUN_TYPE_UNMUTE = "pun.type.unmute";
+        public static final String PUN_TYPE_UNBAN = "pun.type.unban";
         public static final String PUN_STATUS_PENDING = "pun.status.pending";
         public static final String PUN_STATUS_DONE = "pun.status.done";
         public static final String PUN_STATUS_NO_RESPONSE = "pun.status.noResponse";
+        public static final String PUN_STATUS_FAILED = "pun.status.failed";
         public static final String PUN_PLAYER = "pun.player";
         public static final String PUN_NO_RESPONSE_TEXT = "pun.noResponseText";
+
+        // History summary
+        public static final String STAT_TOTAL = "stat.total";
+        public static final String STAT_CONFIRMED = "stat.confirmed";
+        public static final String STAT_FAILED = "stat.failed";
+        public static final String STAT_NO_RESPONSE = "stat.noResponse";
+        public static final String STAT_AWAITING = "stat.awaiting";
+        public static final String STAT_PLAYERS = "stat.players";
+        public static final String STAT_TOP_PLAYER = "stat.topPlayer";
+        public static final String STAT_MODERATORS = "stat.moderators";
+        public static final String STAT_FROM_MACROS = "stat.fromMacros";
+        public static final String STAT_BY_TYPE = "stat.byType";
+        public static final String STAT_FROM_ACTIONS = "stat.fromActions";
+        public static final String HIST_COL_STATUS = "hist.colStatus";
+        public static final String HIST_HINT_CLICK = "hist.hintClick";
+
+        // Punishment details
+        public static final String DETAIL_TITLE = "detail.title";
+        public static final String DETAIL_PLAYER = "detail.player";
+        public static final String DETAIL_TIME = "detail.time";
+        public static final String DETAIL_MODERATOR = "detail.moderator";
+        public static final String DETAIL_TYPE = "detail.type";
+        public static final String DETAIL_MACRO = "detail.macro";
+        public static final String DETAIL_ACTION = "detail.action";
+        public static final String DETAIL_COMMAND = "detail.command";
+        public static final String DETAIL_STATUS = "detail.status";
+        public static final String DETAIL_SERVER_REPLY = "detail.serverReply";
+        public static final String DETAIL_UNKNOWN = "detail.unknown";
+        public static final String DETAIL_NONE = "detail.none";
     }
 
     private static Language current = Language.RU;
@@ -355,6 +389,7 @@ public final class Lang {
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
         ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
+        ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
 
         ru.put(Key.TOGGLE_DETECT_PLAIN, "Ник в тексте сообщения");
         ru.put(Key.TOGGLE_DETECT_DISPLAY, "Отображаемое имя (TAB)");
@@ -428,14 +463,45 @@ public final class Lang {
         ru.put(Key.PUN_TYPE_BAN, "Бан");
         ru.put(Key.PUN_TYPE_MUTE, "Мут");
         ru.put(Key.PUN_TYPE_KICK, "Кик");
-        ru.put(Key.PUN_TYPE_WARN, "Варн");
+        ru.put(Key.PUN_TYPE_WARN, "Пред");
         ru.put(Key.PUN_TYPE_FREEZE, "Заморозка");
-        ru.put(Key.PUN_TYPE_OTHER, "Команда");
-        ru.put(Key.PUN_STATUS_PENDING, "ожидание ответа");
-        ru.put(Key.PUN_STATUS_DONE, "ответ получен");
-        ru.put(Key.PUN_STATUS_NO_RESPONSE, "нет ответа");
+        ru.put(Key.PUN_TYPE_OTHER, "Прочее");
+        ru.put(Key.PUN_TYPE_UNMUTE, "Размут");
+        ru.put(Key.PUN_TYPE_UNBAN, "Разбан");
+        ru.put(Key.PUN_STATUS_PENDING, "Ожидает ответа");
+        ru.put(Key.PUN_STATUS_DONE, "Подтверждён");
+        ru.put(Key.PUN_STATUS_NO_RESPONSE, "Нет ответа");
+        ru.put(Key.PUN_STATUS_FAILED, "Отклонён");
         ru.put(Key.PUN_PLAYER, "Игрок: %s");
         ru.put(Key.PUN_NO_RESPONSE_TEXT, "Ответ сервера не получен");
+
+        ru.put(Key.STAT_TOTAL, "Всего");
+        ru.put(Key.STAT_CONFIRMED, "Подтверждено");
+        ru.put(Key.STAT_FAILED, "Отклонено");
+        ru.put(Key.STAT_NO_RESPONSE, "Без ответа");
+        ru.put(Key.STAT_AWAITING, "Ожидают");
+        ru.put(Key.STAT_PLAYERS, "Игроков");
+        ru.put(Key.STAT_TOP_PLAYER, "Чаще всех");
+        ru.put(Key.STAT_MODERATORS, "Модераторов");
+        ru.put(Key.STAT_FROM_MACROS, "Из макросов");
+        ru.put(Key.STAT_BY_TYPE, "По типам");
+        ru.put(Key.STAT_FROM_ACTIONS, "Из действий");
+        ru.put(Key.HIST_COL_STATUS, "Статус");
+        ru.put(Key.HIST_HINT_CLICK, "Нажмите на запись — подробности");
+
+
+        ru.put(Key.DETAIL_TITLE, "Детали наказания");
+        ru.put(Key.DETAIL_PLAYER, "Нарушитель");
+        ru.put(Key.DETAIL_TIME, "Время наказания");
+        ru.put(Key.DETAIL_MODERATOR, "Модератор");
+        ru.put(Key.DETAIL_TYPE, "Вид наказания");
+        ru.put(Key.DETAIL_MACRO, "Макрос");
+        ru.put(Key.DETAIL_ACTION, "Действие");
+        ru.put(Key.DETAIL_COMMAND, "Команда");
+        ru.put(Key.DETAIL_STATUS, "Статус");
+        ru.put(Key.DETAIL_SERVER_REPLY, "Ответ сервера");
+        ru.put(Key.DETAIL_UNKNOWN, "неизвестно");
+        ru.put(Key.DETAIL_NONE, "—");
 
         ru.put(Key.BTN_PROFILE_CREATE, "Создать");
         ru.put(Key.BTN_PROFILE_SAVE, "Сохранить");
@@ -528,6 +594,7 @@ public final class Lang {
         en.put(Key.TOGGLE_TOASTS, "Notifications");
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
         en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
+        en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
 
         en.put(Key.TOGGLE_DETECT_PLAIN, "Nick in message text");
         en.put(Key.TOGGLE_DETECT_DISPLAY, "Tab-list display name");
@@ -604,11 +671,41 @@ public final class Lang {
         en.put(Key.PUN_TYPE_WARN, "Warn");
         en.put(Key.PUN_TYPE_FREEZE, "Freeze");
         en.put(Key.PUN_TYPE_OTHER, "Command");
+        en.put(Key.PUN_TYPE_UNMUTE, "Unmute");
+        en.put(Key.PUN_TYPE_UNBAN, "Unban");
         en.put(Key.PUN_STATUS_PENDING, "awaiting response");
         en.put(Key.PUN_STATUS_DONE, "confirmed");
         en.put(Key.PUN_STATUS_NO_RESPONSE, "no response");
+        en.put(Key.PUN_STATUS_FAILED, "rejected");
         en.put(Key.PUN_PLAYER, "Player: %s");
         en.put(Key.PUN_NO_RESPONSE_TEXT, "No server response received");
+
+        en.put(Key.STAT_TOTAL, "Total");
+        en.put(Key.STAT_CONFIRMED, "Confirmed");
+        en.put(Key.STAT_FAILED, "Rejected");
+        en.put(Key.STAT_NO_RESPONSE, "No reply");
+        en.put(Key.STAT_AWAITING, "Pending");
+        en.put(Key.STAT_PLAYERS, "Players");
+        en.put(Key.STAT_TOP_PLAYER, "Most punished");
+        en.put(Key.STAT_MODERATORS, "Moderators");
+        en.put(Key.STAT_FROM_MACROS, "From macros");
+        en.put(Key.STAT_BY_TYPE, "By type");
+        en.put(Key.STAT_FROM_ACTIONS, "From actions");
+        en.put(Key.HIST_COL_STATUS, "Status");
+        en.put(Key.HIST_HINT_CLICK, "Click an entry for details");
+
+        en.put(Key.DETAIL_TITLE, "Punishment details");
+        en.put(Key.DETAIL_PLAYER, "Player");
+        en.put(Key.DETAIL_TIME, "Time");
+        en.put(Key.DETAIL_MODERATOR, "Moderator");
+        en.put(Key.DETAIL_TYPE, "Type");
+        en.put(Key.DETAIL_MACRO, "Macro");
+        en.put(Key.DETAIL_ACTION, "Action");
+        en.put(Key.DETAIL_COMMAND, "Command");
+        en.put(Key.DETAIL_STATUS, "Status");
+        en.put(Key.DETAIL_SERVER_REPLY, "Server reply");
+        en.put(Key.DETAIL_UNKNOWN, "unknown");
+        en.put(Key.DETAIL_NONE, "—");
 
         en.put(Key.BTN_PROFILE_CREATE, "Create");
         en.put(Key.BTN_PROFILE_SAVE, "Save");

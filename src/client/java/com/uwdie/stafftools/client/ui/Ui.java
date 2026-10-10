@@ -1,5 +1,6 @@
 package com.uwdie.stafftools.client.ui;
 
+import com.uwdie.stafftools.client.StafftoolsClient;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.sound.PositionedSoundInstance;
@@ -604,6 +605,14 @@ public final class Ui {
                 argb(mix(TEXT, ACCENT, 0.6f), alpha * 0.08f)
         );
 
+        // the same orbit animation as the menus, in its thin preset so
+        // it stays quiet on top of a small overlay panel
+        drawOrbitFrameThin(
+                context,
+                x, y, width, height,
+                alpha
+        );
+
         // accent ribbons that follow the same palette
         drawGradientH(
                 context,
@@ -622,6 +631,45 @@ public final class Ui {
                 ACCENT,
                 alpha * 0.45f
         );
+    }
+
+    /**
+     * Geometry + glow tuning of the orbit animation.
+     *
+     * Two presets are shipped: {@link #FULL} for the menu screens (four
+     * bars, thick halo) and {@link #THIN} for the popup frames, where the
+     * same animation must stay subtle and narrow.
+     */
+    public record OrbitStyle(
+            int inset,
+            int radius,
+            int bars,
+            int barMin,
+            int barMax,
+            int barDivisor,
+            int haloWide,
+            int haloTight,
+            float wideAlpha,
+            float tightAlpha
+    ) {
+
+        /** Menu screens: four wide bars with a fat glow. */
+        public static final OrbitStyle FULL =
+                new OrbitStyle(
+                        5, 6, 4,
+                        48, 150, 6,
+                        5, 3,
+                        0.10f, 0.30f
+                );
+
+        /** Popup frames: fewer, shorter bars and a much tighter halo. */
+        public static final OrbitStyle THIN =
+                new OrbitStyle(
+                        3, 4, 2,
+                        18, 64, 10,
+                        3, 1,
+                        0.09f, 0.24f
+                );
     }
 
     /**
@@ -645,8 +693,57 @@ public final class Ui {
             float alpha
     ) {
 
-        int inset = 5;
-        int radius = 6;
+        drawOrbitFrame(
+                context,
+                x, y, width, height,
+                alpha,
+                OrbitStyle.FULL
+        );
+    }
+
+    /**
+     * The same animation, drawn with the {@link OrbitStyle#THIN} preset:
+     * fewer bars, shorter travel and a halo that stays inside one pixel
+     * of the frame line. Used by the popup frames.
+     */
+    public static void drawOrbitFrameThin(
+            DrawContext context,
+            int x,
+            int y,
+            int width,
+            int height,
+            float alpha
+    ) {
+
+        drawOrbitFrame(
+                context,
+                x, y, width, height,
+                alpha,
+                OrbitStyle.THIN
+        );
+    }
+
+    /** Style-driven core of {@link #drawOrbitFrame}. */
+    public static void drawOrbitFrame(
+            DrawContext context,
+            int x,
+            int y,
+            int width,
+            int height,
+            float alpha,
+            OrbitStyle style
+    ) {
+
+        // one global switch: the animation may be turned off in the
+        // main menu, which also covers the popup frames
+        if (!StafftoolsClient.getConfig()
+                .isMenuAnimation()) {
+
+            return;
+        }
+
+        int inset = style.inset();
+        int radius = style.radius();
 
         int ix = x + inset;
         int iy = y + inset;
@@ -683,11 +780,15 @@ public final class Ui {
 
         float phaseT = (float) (phase * perimeter);
 
-        int bars = 4;
+        int bars = style.bars();
 
-        int barLength = Math.max(
-                48,
-                Math.min(150, perimeter / 6)
+        // a small frame needs proportionally short bars, or four of them
+        // would merge into one continuous ring and the animation would
+        // stop being readable
+        int barLength = Math.clamp(
+                perimeter / Math.max(1, style.barDivisor()),
+                style.barMin(),
+                Math.max(style.barMin(), style.barMax())
         );
 
         for (int i = 0; i < bars; i++) {
@@ -702,7 +803,8 @@ public final class Ui {
                     ix, iy, iw, ih, radius,
                     top, side, perimeter,
                     tail, barLength,
-                    alpha
+                    alpha,
+                    style
             );
         }
     }
@@ -728,7 +830,8 @@ public final class Ui {
             int perimeter,
             float tail,
             int length,
-            float alpha
+            float alpha,
+            OrbitStyle style
     ) {
 
         if (length <= 0 || alpha <= 0.004f) {
@@ -748,6 +851,9 @@ public final class Ui {
         int glow = mix(edge, core, 0.45f);
 
         int slices = length * 2;
+
+        int wide = style.haloWide();
+        int tight = style.haloTight();
 
         for (int i = 0; i < slices; i++) {
 
@@ -772,14 +878,17 @@ public final class Ui {
             int rgb = mix(edge, core, smoothstep(0.10f, 0.85f, m));
 
             // wide soft halo, drawn under the core
-            strokePerimeter(
-                    context,
-                    x, y, width, height, radius,
-                    top, side, perimeter,
-                    p0, p1,
-                    5,
-                    argb(glow, alpha * a * 0.10f)
-            );
+            if (wide > tight) {
+
+                strokePerimeter(
+                        context,
+                        x, y, width, height, radius,
+                        top, side, perimeter,
+                        p0, p1,
+                        wide,
+                        argb(glow, alpha * a * style.wideAlpha())
+                );
+            }
 
             // tight halo: most of the glow
             strokePerimeter(
@@ -787,8 +896,8 @@ public final class Ui {
                     x, y, width, height, radius,
                     top, side, perimeter,
                     p0, p1,
-                    3,
-                    argb(rgb, alpha * a * 0.30f)
+                    tight,
+                    argb(rgb, alpha * a * style.tightAlpha())
             );
 
             // bright core

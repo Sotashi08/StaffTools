@@ -550,6 +550,14 @@ public class MacroEditorScreen extends StScreen {
                 panelBottom - 34,
                 alpha
         );
+        Ui.drawOrbitFrame(
+                context,
+                panelX,
+                34,
+                panelW,
+                panelBottom - 34,
+                alpha
+        );
 
         drawTitle(context, titleKey, alpha);
 
@@ -605,6 +613,14 @@ public class MacroEditorScreen extends StScreen {
         );
 
         Ui.drawPanel(
+                context,
+                aliasPanelX,
+                34,
+                aliasPanelW,
+                aliasPanelBottom - 34,
+                alpha
+        );
+        Ui.drawOrbitFrame(
                 context,
                 aliasPanelX,
                 34,
@@ -732,6 +748,14 @@ public class MacroEditorScreen extends StScreen {
         );
 
         Ui.drawPanel(
+                context,
+                infoPanelX,
+                top,
+                INFO_W,
+                bottom - top,
+                alpha
+        );
+        Ui.drawOrbitFrame(
                 context,
                 infoPanelX,
                 top,

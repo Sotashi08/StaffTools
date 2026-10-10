@@ -376,6 +376,14 @@ public class ProfileEditScreen extends StScreen {
                 height - 34 - 26,
                 alpha
         );
+        Ui.drawOrbitFrame(
+                context,
+                panelLeft,
+                34,
+                panelWidth,
+                height - 34 - 26,
+                alpha
+        );
 
         context.drawTextWithShadow(
                 textRenderer,

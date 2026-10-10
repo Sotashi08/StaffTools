@@ -30,6 +30,9 @@ public class StaffToolsConfig {
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
+    /** Animated frame around the panels (menus + popups). */
+    private boolean menuAnimation = true;
+
     // nick detection methods (see DetectionSettingsScreen)
     private boolean detectPlain = true;
     private boolean detectDisplay = true;
@@ -97,6 +100,14 @@ public class StaffToolsConfig {
 
     public void setSavePopupSize(boolean enabled) {
         this.savePopupSize = enabled;
+    }
+
+    public boolean isMenuAnimation() {
+        return menuAnimation;
+    }
+
+    public void setMenuAnimation(boolean enabled) {
+        this.menuAnimation = enabled;
     }
 
     /** Width of the in-chat actions popup, in GUI pixels. */

@@ -70,6 +70,16 @@ public class ActionEntry {
         ));
 
         list.add(new ActionEntry(
+                "🔊", "Unmute", "/unmute <player>",
+                false, true, false, false
+        ));
+
+        list.add(new ActionEntry(
+                "🔓", "Unban", "/unban <player>",
+                false, true, false, false
+        ));
+
+        list.add(new ActionEntry(
                 "📋", "Copy name", "",
                 true, true, false, false
         ));

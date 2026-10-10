@@ -89,6 +89,14 @@ public class ThemesScreen extends StScreen {
                 panelBottom - 34,
                 alpha
         );
+        Ui.drawOrbitFrame(
+                context,
+                formLeft(),
+                34,
+                formWidth(),
+                panelBottom - 34,
+                alpha
+        );
 
         drawTitle(context, Key.BTN_THEMES, alpha);
 

@@ -14,6 +14,28 @@ public class PunishmentRecord {
     private PunishmentStatus status;
     private String response;
 
+    /** Local staff member who issued the punishment. */
+    private String moderator;
+
+    /** What produced the punishment: a macro, an action or a raw command. */
+    private SourceKind sourceKind = SourceKind.MANUAL;
+
+    /** Name of the macro or action the punishment came from. */
+    private String sourceName;
+
+    /** Where a punishment came from. */
+    public enum SourceKind {
+
+        /** Typed by hand. */
+        MANUAL,
+
+        /** Sent by one of the user's macros. */
+        MACRO,
+
+        /** Sent by one of the player-action entries. */
+        ACTION
+    }
+
     public PunishmentRecord() {
         this.type = PunishmentType.OTHER;
         this.status = PunishmentStatus.PENDING;
@@ -62,10 +84,18 @@ public class PunishmentRecord {
     }
 
     public PunishmentStatus getStatus() {
-        return status;
+        // records written by an older build may carry no status at all
+        return status == null
+                ? PunishmentStatus.NO_RESPONSE
+                : status;
     }
 
     public PunishmentStatus getEffectiveStatus() {
+
+        if (status == null) {
+            return PunishmentStatus.NO_RESPONSE;
+        }
+
         if (status == PunishmentStatus.PENDING &&
                 System.currentTimeMillis() - timestamp >
                         RESPONSE_TIMEOUT_MS) {
@@ -83,5 +113,73 @@ public class PunishmentRecord {
 
     public void setResponse(String response) {
         this.response = response;
+    }
+
+    public String getResponse() {
+        return response;
+    }
+
+    /** Local staff member who issued the punishment. */
+    public String getModerator() {
+        return moderator == null || moderator.isBlank()
+                ? "—"
+                : moderator;
+    }
+
+    public void setModerator(String moderator) {
+        this.moderator = moderator;
+    }
+
+    /** Source of the punishment: a macro, an action or a raw command. */
+    public SourceKind getSourceKind() {
+        return sourceKind == null
+                ? SourceKind.MANUAL
+                : sourceKind;
+    }
+
+    public void setSourceKind(SourceKind sourceKind) {
+        this.sourceKind = sourceKind == null
+                ? SourceKind.MANUAL
+                : sourceKind;
+    }
+
+    /**
+     * Name of the macro or action that produced this punishment, or null
+     * when it was typed by hand.
+     */
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
+    }
+
+    /** Name of the macro, kept for records written by older builds. */
+    public String getMacroName() {
+        return sourceName;
+    }
+
+    public void setMacroName(String macroName) {
+        this.sourceName = macroName;
+
+        // old builds only ever recorded macros
+        if (macroName != null && !macroName.isBlank()) {
+            this.sourceKind = SourceKind.MACRO;
+        }
+    }
+
+    /** Command as it was sent, with the nick already substituted. */
+    public String getFullCommand() {
+        return command == null || command.isBlank()
+                ? "—"
+                : command;
+    }
+
+    /** Resolved staff member name, or null when unknown. */
+    public String getModeratorOrNull() {
+        return moderator == null || moderator.isBlank()
+                ? null
+                : moderator;
     }
 }

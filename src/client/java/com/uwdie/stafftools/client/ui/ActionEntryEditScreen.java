@@ -4,6 +4,7 @@ import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.config.ActionEntry;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import com.uwdie.stafftools.client.macro.MacroExecutor;
 import com.uwdie.stafftools.client.macro.Placeholder;
 import com.uwdie.stafftools.client.macro.PlaceholderRegistry;
 import com.uwdie.stafftools.client.ui.widget.StButton;
@@ -154,16 +155,41 @@ public class ActionEntryEditScreen extends StScreen {
 
         int chipW = 70;
 
+        // placeholder tags, with <alias> inserted right after <player>
+        // so an action can ask for a variant the same way a macro does
+        List<Object[]> defs = new java.util.ArrayList<>();
+
         for (Placeholder placeholder :
                 PlaceholderRegistry.getAll()) {
 
+            String tag =
+                    "<" + placeholder.name() + ">";
+
+            defs.add(new Object[]{
+                    tag,
+                    Lang.t(placeholder.description())
+            });
+
+            if (placeholder.name().equals("player")) {
+
+                defs.add(new Object[]{
+                        MacroExecutor.ALIAS_TOKEN,
+                        Lang.t(Key.MSG_ALIAS_HELP)
+                });
+            }
+
             chipW = Math.max(
                     chipW,
-                    textRenderer.getWidth(
-                            "<" + placeholder.name() + ">"
-                    ) + 10
+                    textRenderer.getWidth(tag) + 10
             );
         }
+
+        chipW = Math.max(
+                chipW,
+                textRenderer.getWidth(
+                        MacroExecutor.ALIAS_TOKEN
+                ) + 10
+        );
 
         int step = chipW + 4;
 
@@ -175,11 +201,10 @@ public class ActionEntryEditScreen extends StScreen {
         int row = 0;
         int col = 0;
 
-        for (Placeholder placeholder :
-                PlaceholderRegistry.getAll()) {
+        for (Object[] def : defs) {
 
-            String tag =
-                    "<" + placeholder.name() + ">";
+            String tag = (String) def[0];
+            String tooltip = (String) def[1];
 
             int bx = left + col * step;
             int by = chipsY + row * 24;
@@ -190,7 +215,7 @@ public class ActionEntryEditScreen extends StScreen {
                             by,
                             chipW,
                             tag,
-                            Lang.t(placeholder.description())
+                            tooltip
                     )
             );
 
@@ -516,6 +541,14 @@ public class ActionEntryEditScreen extends StScreen {
                 panelBottom - 34,
                 alpha
         );
+        Ui.drawOrbitFrame(
+                context,
+                panelX,
+                34,
+                panelW,
+                panelBottom - 34,
+                alpha
+        );
 
         drawTitle(context, titleKey, alpha);
 
@@ -571,6 +604,14 @@ public class ActionEntryEditScreen extends StScreen {
         );
 
         Ui.drawPanel(
+                context,
+                aliasPanelX,
+                34,
+                aliasPanelW,
+                aliasPanelBottom - 34,
+                alpha
+        );
+        Ui.drawOrbitFrame(
                 context,
                 aliasPanelX,
                 34,
@@ -698,6 +739,14 @@ public class ActionEntryEditScreen extends StScreen {
         );
 
         Ui.drawPanel(
+                context,
+                infoPanelX,
+                top,
+                INFO_W,
+                bottom - top,
+                alpha
+        );
+        Ui.drawOrbitFrame(
                 context,
                 infoPanelX,
                 top,

@@ -453,6 +453,14 @@ public class ProfilesScreen extends StScreen {
                 listBottom - LIST_TOP + 16,
                 alpha
         );
+        Ui.drawOrbitFrame(
+                context,
+                rowLeft,
+                LIST_TOP - 8,
+                rowWidth,
+                listBottom - LIST_TOP + 16,
+                alpha
+        );
 
         if (rows.isEmpty()) {
 
