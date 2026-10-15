@@ -5,12 +5,14 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
 
 /**
  * Custom themed button with entrance animation and smooth hover lerp.
+ *
+ * {@code Text} is inherited from {@link ButtonWidget} and names its own
+ * nested class, so the message type is spelled out in full here.
  */
-public class StButton extends ButtonWidget {
+public class StButton extends ButtonWidget.Text {
 
     private final long appear;
     private final int slot;
@@ -25,7 +27,7 @@ public class StButton extends ButtonWidget {
             int y,
             int width,
             int height,
-            Text message,
+            net.minecraft.text.Text message,
             PressAction onPress,
             int slot,
             int accent
@@ -49,7 +51,7 @@ public class StButton extends ButtonWidget {
             int y,
             int width,
             int height,
-            Text message,
+            net.minecraft.text.Text message,
             PressAction onPress,
             long appear,
             int slot,
@@ -72,7 +74,7 @@ public class StButton extends ButtonWidget {
     }
 
     @Override
-    protected void renderWidget(
+    protected void drawIcon(
             DrawContext context,
             int mouseX,
             int mouseY,
@@ -122,12 +124,11 @@ public class StButton extends ButtonWidget {
                 ? 0xFFFFFFFF
                 : 0xFF888888;
 
-        context.getMatrices().push();
+        context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
                 0,
-                (1 - alpha) * 5,
-                0
+                (1 - alpha) * 5
         );
 
         Ui.drawRoundRect(
@@ -169,6 +170,6 @@ public class StButton extends ButtonWidget {
                 Ui.argb(textColor, alpha)
         );
 
-        context.getMatrices().pop();
+        context.getMatrices().popMatrix();
     }
 }

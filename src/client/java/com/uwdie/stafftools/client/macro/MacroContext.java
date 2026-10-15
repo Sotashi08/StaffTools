@@ -101,7 +101,7 @@ public class MacroContext {
                 client.getNetworkHandler().getPlayerList()) {
 
             if (target.uuid()
-                    .equals(entry.getProfile().getId())) {
+                    .equals(entry.getProfile().id())) {
 
                 return Integer.toString(
                         entry.getLatency()

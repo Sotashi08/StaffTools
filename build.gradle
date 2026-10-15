@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.17-SNAPSHOT'
+    id 'fabric-loom' version '1.17.21'
     id 'maven-publish'
 }
 
@@ -103,3 +103,8 @@ publishing {
         // retrieving dependencies.
     }
 }
+
+
+
+
+

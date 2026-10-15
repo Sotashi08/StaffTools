@@ -10,10 +10,15 @@ import com.uwdie.stafftools.client.player.PlayerResolver;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
 import com.uwdie.stafftools.client.ui.Toasts;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.ClickEvent;
+import net.minecraft.text.Style;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -21,6 +26,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.UUID;
 
 @Mixin(ChatScreen.class)
 public class ChatScreenMixin {
@@ -50,17 +57,163 @@ public class ChatScreenMixin {
         Toasts.INSTANCE.render(context);
     }
 
+    /**
+     * Since 1.21.11 the chat screen resolves the style under the cursor
+     * itself ({@code ChatScreen#handleClickEvent}), so the interception
+     * of our own and of foreign click events lives here now.
+     */
+    @Inject(
+            method = "handleClickEvent",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void stafftools$onTextClick(
+            Style style,
+            boolean insert,
+            CallbackInfoReturnable<Boolean> cir
+    ) {
+
+        if (style == null) {
+            return;
+        }
+
+        ClickEvent event = style.getClickEvent();
+
+        if (event == null) {
+            return;
+        }
+
+        String value = commandOf(event);
+
+        if (value == null) {
+            return;
+        }
+
+        // Foreign click (e.g. "/msg Notch " from a chat plugin):
+        // resolve the player and open the actions popup instead of
+        // letting vanilla paste the command into the input field.
+        if (!value.startsWith("stafftools:player:")) {
+
+            PlayerContext foreign =
+                    ChatTextProcessor.resolveFromForeignClick(
+                            value
+                    );
+
+            if (foreign != null &&
+                    StafftoolsClient.getConfig()
+                            .isPlayerActionsEnabled()) {
+
+                PlayerActionOverlay.INSTANCE.open(foreign);
+
+                cir.setReturnValue(true);
+            }
+
+            return;
+        }
+
+        String rest = value.substring(
+                "stafftools:player:".length()
+        );
+
+        int separator = rest.lastIndexOf(':');
+
+        String name =
+                separator >= 0
+                        ? rest.substring(0, separator)
+                        : rest;
+
+        String uuidPart =
+                separator >= 0
+                        ? rest.substring(separator + 1)
+                        : "";
+
+        UUID uuid = null;
+
+        if (!uuidPart.isEmpty()) {
+
+            try {
+                uuid = UUID.fromString(uuidPart);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        PlayerContext player = null;
+
+        if (uuid != null) {
+            player = PlayerResolver.resolveByUuid(uuid)
+                    .orElse(null);
+        }
+
+        if (player == null) {
+            player = PlayerResolver.resolve(name)
+                    .orElse(null);
+        }
+
+        if (player == null && uuid != null) {
+            player = new PlayerContext(name, uuid);
+        }
+
+        if (player == null) {
+            return;
+        }
+
+        boolean shift =
+                InputUtil.isKeyPressed(
+                        MinecraftClient.getInstance().getWindow(),
+                        GLFW.GLFW_KEY_LEFT_SHIFT
+                );
+
+        MinecraftClient client =
+                MinecraftClient.getInstance();
+
+        if (shift &&
+                StafftoolsClient.getConfig()
+                        .isClickToCopyEnabled()) {
+
+            client.keyboard.setClipboard(
+                    player.name()
+            );
+        }
+
+        if (StafftoolsClient.getConfig()
+                .isPlayerActionsEnabled()) {
+
+            PlayerActionOverlay.INSTANCE.open(player);
+        }
+
+        cir.setReturnValue(true);
+    }
+
+    /**
+     * The command behind a click event, whichever command flavour it is
+     * ({@code RUN_COMMAND} or {@code SUGGEST_COMMAND}).
+     */
+    private static String commandOf(ClickEvent event) {
+
+        if (event instanceof ClickEvent.RunCommand run) {
+            return run.command();
+        }
+
+        if (event instanceof ClickEvent.SuggestCommand suggest) {
+            return suggest.command();
+        }
+
+        return null;
+    }
+
     @Inject(
             method = "mouseClicked",
             at = @At("HEAD"),
             cancellable = true
     )
     private void stafftools$onMouseClicked(
-            double mouseX,
-            double mouseY,
-            int button,
+            Click click,
+            boolean doubled,
             CallbackInfoReturnable<Boolean> cir
     ) {
+
+        double mouseX = click.x();
+        double mouseY = click.y();
 
         // chat-input nick detection has priority over everything:
         // click on a hand-typed online nick -> actions popup
@@ -74,7 +227,7 @@ public class ChatScreenMixin {
                 PlayerActionOverlay.INSTANCE.mouseClicked(
                         mouseX,
                         mouseY,
-                        button
+                        click.button()
                 )) {
 
             cir.setReturnValue(true);
@@ -119,14 +272,12 @@ public class ChatScreenMixin {
             cancellable = true
     )
     private void stafftools$onKeyPressed(
-            int keyCode,
-            int scanCode,
-            int modifiers,
+            KeyInput input,
             CallbackInfoReturnable<Boolean> cir
     ) {
 
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
-                keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                input.key() == GLFW.GLFW_KEY_ESCAPE) {
 
             // closes the alias modal first, then the popup itself
             cir.setReturnValue(
@@ -286,7 +437,10 @@ public class ChatScreenMixin {
 
         // shift keeps the old behaviour: copy the nick instead of
         // opening the actions popup
-        if (Screen.hasShiftDown() &&
+        if (InputUtil.isKeyPressed(
+                MinecraftClient.getInstance().getWindow(),
+                GLFW.GLFW_KEY_LEFT_SHIFT
+        ) &&
                 StafftoolsClient.getConfig().isClickToCopyEnabled()) {
 
             MinecraftClient.getInstance().keyboard

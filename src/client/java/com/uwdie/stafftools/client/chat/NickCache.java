@@ -22,8 +22,6 @@ import java.util.UUID;
  */
 public final class NickCache {
 
-    private static final int MAX_ENTRIES = 600;
-
     private static final NickCache INSTANCE =
             new NickCache();
 
@@ -60,7 +58,7 @@ public final class NickCache {
                 new PlayerContext(name, offlineUuid(name))
         );
 
-        if (nicks.size() > MAX_ENTRIES) {
+        if (nicks.size() > 600) {
 
             String oldest = nicks.keySet().iterator().next();
             nicks.remove(oldest);
@@ -86,7 +84,7 @@ public final class NickCache {
 
         for (PlayerListEntry entry : handler.getPlayerList()) {
 
-            String name = entry.getProfile().getName();
+            String name = entry.getProfile().name();
 
             if (name != null) {
                 remember(name);

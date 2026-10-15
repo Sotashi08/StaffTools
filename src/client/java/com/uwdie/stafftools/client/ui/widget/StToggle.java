@@ -7,7 +7,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.Text;
+import net.minecraft.client.input.AbstractInput;
 
 import java.util.function.Consumer;
 
@@ -15,8 +15,11 @@ import java.util.function.Consumer;
  * Toggle that looks exactly like a regular StButton: same background,
  * border and label, with a small round color indicator on the right
  * (accent = on, muted gray = off).
+ *
+ * {@code Text} is inherited from {@link ButtonWidget} and names its own
+ * nested class, so the message type is spelled out in full here.
  */
-public class StToggle extends ButtonWidget {
+public class StToggle extends ButtonWidget.Text {
 
     private static final int DOT = 8;
 
@@ -42,7 +45,8 @@ public class StToggle extends ButtonWidget {
             int slot
     ) {
 
-        super(x, y, width, height, Text.empty(), b -> {
+        super(x, y, width, height,
+                net.minecraft.text.Text.empty(), b -> {
         }, DEFAULT_NARRATION_SUPPLIER);
 
         this.appear = System.currentTimeMillis();
@@ -57,7 +61,7 @@ public class StToggle extends ButtonWidget {
     private void updateMessage() {
 
         setMessage(
-                Text.literal(
+                net.minecraft.text.Text.literal(
                         Lang.t(labelKey) +
                                 ": " +
                                 (value
@@ -68,7 +72,7 @@ public class StToggle extends ButtonWidget {
     }
 
     @Override
-    public void onPress() {
+    public void onPress(AbstractInput input) {
 
         value = !value;
         updateMessage();
@@ -91,7 +95,7 @@ public class StToggle extends ButtonWidget {
     }
 
     @Override
-    protected void renderWidget(
+    protected void drawIcon(
             DrawContext context,
             int mouseX,
             int mouseY,
@@ -138,12 +142,11 @@ public class StToggle extends ButtonWidget {
                 hoverAmt
         );
 
-        context.getMatrices().push();
+        context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
                 0,
-                (1 - alpha) * 5,
-                0
+                (1 - alpha) * 5
         );
 
         Ui.drawRoundRect(
@@ -188,7 +191,7 @@ public class StToggle extends ButtonWidget {
 
         context.drawTextWithShadow(
                 textRenderer,
-                Text.literal(Lang.t(labelKey)),
+                net.minecraft.text.Text.literal(Lang.t(labelKey)),
                 x + 10,
                 y + (h - 9) / 2,
                 Ui.argb(labelColor, alpha)
@@ -252,6 +255,6 @@ public class StToggle extends ButtonWidget {
                 Ui.argb(0x66FFFFFF, alpha)
         );
 
-        context.getMatrices().pop();
+        context.getMatrices().popMatrix();
     }
 }

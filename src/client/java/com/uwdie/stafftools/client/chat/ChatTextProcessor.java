@@ -35,8 +35,6 @@ import java.util.regex.Pattern;
  */
 public final class ChatTextProcessor {
 
-    public static final String CLICK_PREFIX = "stafftools:player:";
-
     private static final Pattern COMMAND_PLAYER = Pattern.compile(
             "^/?(?:msg|tell|whisper|w|m|t)\\s+([A-Za-z0-9_]{2,16})(?:\\s|$)",
             Pattern.CASE_INSENSITIVE
@@ -126,7 +124,7 @@ public final class ChatTextProcessor {
      */
     public static PlayerContext resolveFromForeignClick(String value) {
 
-        if (value == null || value.startsWith(CLICK_PREFIX)) {
+        if (value == null || value.startsWith("stafftools:player:")) {
             return null;
         }
 
@@ -171,6 +169,37 @@ public final class ChatTextProcessor {
                 ("OfflinePlayer:" + name)
                         .getBytes(StandardCharsets.UTF_8)
         );
+    }
+
+    /**
+     * The command behind a click event, whatever command flavour it is.
+     * Since 1.21.11 the event is one of the {@code ClickEvent} records,
+     * so both the "send it" and the "suggest it" variant are unwrapped.
+     */
+    private static String commandOf(ClickEvent click) {
+
+        if (click instanceof ClickEvent.RunCommand run) {
+            return run.command();
+        }
+
+        if (click instanceof ClickEvent.SuggestCommand suggest) {
+            return suggest.command();
+        }
+
+        return null;
+    }
+
+    /**
+     * The text behind a hover event, or {@code null} for every other
+     * hover flavour.
+     */
+    private static Text hoverTextOf(HoverEvent hover) {
+
+        if (hover instanceof HoverEvent.ShowText show) {
+            return show.value();
+        }
+
+        return null;
     }
 
     private static Text processNode(Text node) {
@@ -245,12 +274,10 @@ public final class ChatTextProcessor {
                 result.append(part);
             }
 
-            appendProcessedSiblings(
+            return withProcessedSiblings(
                     result,
                     node
             );
-
-            return result;
         }
 
         if (content instanceof TranslatableTextContent translatable) {
@@ -276,25 +303,31 @@ public final class ChatTextProcessor {
                                 newArgs
                         ).setStyle(style);
 
-                appendProcessedSiblings(
+                return withProcessedSiblings(
                         result,
                         node
                 );
-
-                return result;
             }
         }
 
         return node;
     }
 
-    private static void appendProcessedSiblings(
+    /**
+     * Appends the processed siblings of {@code node} to {@code out}.
+     * Branches that were left untouched hand back their very own node,
+     * so a copy of a sibling is made only where the highlighting really
+     * changed something.
+     */
+    private static Text withProcessedSiblings(
             MutableText out,
             Text node
     ) {
         for (Text sibling : node.getSiblings()) {
             out.append(processNode(sibling));
         }
+
+        return out;
     }
 
     /**
@@ -314,7 +347,7 @@ public final class ChatTextProcessor {
 
             PlayerContext fromCommand =
                     resolveFromForeignClick(
-                            click.getValue()
+                            commandOf(click)
                     );
 
             if (fromCommand != null) {
@@ -326,34 +359,24 @@ public final class ChatTextProcessor {
             return null;
         }
 
-        HoverEvent hover = style.getHoverEvent();
+        Text hoverText = hoverTextOf(style.getHoverEvent());
 
-        if (hover != null &&
-                hover.getAction() ==
-                        HoverEvent.Action.SHOW_TEXT) {
+        if (hoverText != null) {
 
-            Text hoverText = hover.getValue(
-                    HoverEvent.Action.SHOW_TEXT
-            );
+            String hoverString = hoverText.getString();
 
-            if (hoverText != null) {
+            List<PlayerMention> mentions =
+                    PlayerMentionDetector.detect(
+                            hoverString
+                    );
 
-                String hoverString =
-                        hoverText.getString();
-
-                List<PlayerMention> mentions =
-                        PlayerMentionDetector.detect(
-                                hoverString
-                        );
-
-                if (!mentions.isEmpty()) {
-                    return mentions.get(0).player();
-                }
-
-                return PlayerResolver
-                        .resolveByDisplayName(hoverString)
-                        .orElse(null);
+            if (!mentions.isEmpty()) {
+                return mentions.get(0).player();
             }
+
+            return PlayerResolver
+                    .resolveByDisplayName(hoverString)
+                    .orElse(null);
         }
 
         return null;
@@ -434,7 +457,7 @@ public final class ChatTextProcessor {
             PlayerContext player
     ) {
         String value =
-                CLICK_PREFIX +
+                "stafftools:player:" +
                         player.name() +
                         ":" +
                         player.uuid();
@@ -442,18 +465,14 @@ public final class ChatTextProcessor {
         return baseStyle
                 .withColor(Formatting.YELLOW)
                 .withClickEvent(
-                        new ClickEvent(
-                                ClickEvent.Action.RUN_COMMAND,
-                                value
-                        )
+                        new ClickEvent.RunCommand(value)
                 )
                 .withHoverEvent(
-                        new HoverEvent(
-                                HoverEvent.Action.SHOW_TEXT,
+                        new HoverEvent.ShowText(
                                 Text.literal(player.name())
                                         .append("\n")
                                         .append(
-                                                Text.literal(Lang.t(Lang.Key.HOVER_CLICK))
+                                                Text.literal(Lang.t("hover.click"))
                                                         .setStyle(
                                                                 Style.EMPTY
                                                                         .withColor(Formatting.GOLD)
@@ -461,7 +480,7 @@ public final class ChatTextProcessor {
                                         )
                                         .append("\n")
                                         .append(
-                                                Text.literal(Lang.t(Lang.Key.HOVER_SHIFT_CLICK))
+                                                Text.literal(Lang.t("hover.shiftClick"))
                                                         .setStyle(
                                                                 Style.EMPTY
                                                                         .withColor(Formatting.GRAY)

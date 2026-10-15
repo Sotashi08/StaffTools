@@ -24,14 +24,14 @@ public class PlayerResolver {
         for (PlayerListEntry entry :
                 client.getNetworkHandler().getPlayerList()) {
 
-            String playerName = entry.getProfile().getName();
+            String playerName = entry.getProfile().name();
 
             if (playerName.equalsIgnoreCase(name.trim())) {
 
                 return Optional.of(
                         new PlayerContext(
                                 playerName,
-                                entry.getProfile().getId()
+                                entry.getProfile().id()
                         )
                 );
             }
@@ -76,8 +76,8 @@ public class PlayerResolver {
 
                 return Optional.of(
                         new PlayerContext(
-                                entry.getProfile().getName(),
-                                entry.getProfile().getId()
+                                entry.getProfile().name(),
+                                entry.getProfile().id()
                         )
                 );
             }
@@ -101,12 +101,12 @@ public class PlayerResolver {
                 client.getNetworkHandler().getPlayerList()) {
 
             if (uuid.equals(
-                    entry.getProfile().getId()
+                    entry.getProfile().id()
             )) {
 
                 return Optional.of(
                         new PlayerContext(
-                                entry.getProfile().getName(),
+                                entry.getProfile().name(),
                                 uuid
                         )
                 );
@@ -133,14 +133,14 @@ public class PlayerResolver {
         for (PlayerListEntry entry :
                 client.getNetworkHandler().getPlayerList()) {
 
-            String name = entry.getProfile().getName();
+            String name = entry.getProfile().name();
 
             if (containsName(text, name)) {
 
                 result.add(
                         new PlayerContext(
                                 name,
-                                entry.getProfile().getId()
+                                entry.getProfile().id()
                         )
                 );
             }

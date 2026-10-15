@@ -290,9 +290,9 @@ public class DetectionSettingsScreen extends StScreen {
 
         context.enableScissor(
                 rowLeft + ROW_PAD,
-                LIST_TOP + shift,
+                LIST_TOP,
                 rowLeft + rowWidth - ROW_PAD,
-                listBottom + shift
+                listBottom
         );
 
         long now = System.currentTimeMillis();

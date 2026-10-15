@@ -374,9 +374,9 @@ public class ActionsConfigScreen extends StScreen {
 
         context.enableScissor(
                 rowLeft + ROW_PAD,
-                LIST_TOP + shift,
+                LIST_TOP,
                 rowLeft + rowWidth - ROW_PAD,
-                listBottom + shift
+                listBottom
         );
 
         for (int i = 0; i < rows.size(); i++) {

@@ -960,7 +960,7 @@ public final class Ui {
         }
 
         client.getSoundManager().play(
-                PositionedSoundInstance.master(
+                PositionedSoundInstance.ui(
                         SoundEvents.BLOCK_NOTE_BLOCK_HAT
                                 .value(),
                         2.0f,

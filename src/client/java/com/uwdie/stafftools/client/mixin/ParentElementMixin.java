@@ -1,6 +1,7 @@
 package com.uwdie.stafftools.client.mixin;
 
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.screen.ChatScreen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -9,9 +10,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * In 1.21.x the mouse drag/release handlers live in the {@code ParentElement}
- * interface as default methods ({@link Screen} does not override them), so we
- * inject here and only act when the current element is the chat screen.
+ * The mouse drag/release handlers live in the {@code ParentElement}
+ * interface as default methods, so we inject here and only act when the
+ * current element is the chat screen. Since 1.21.9 they take a
+ * {@link Click} record instead of raw coordinates.
  */
 @Mixin(ParentElement.class)
 public interface ParentElementMixin {
@@ -22,11 +24,9 @@ public interface ParentElementMixin {
             cancellable = true
     )
     default void stafftools$onMouseDragged(
-            double mouseX,
-            double mouseY,
-            int button,
-            double deltaX,
-            double deltaY,
+            Click click,
+            double offsetX,
+            double offsetY,
             CallbackInfoReturnable<Boolean> cir
     ) {
 
@@ -36,11 +36,11 @@ public interface ParentElementMixin {
 
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 PlayerActionOverlay.INSTANCE.mouseDragged(
-                        mouseX,
-                        mouseY,
-                        button,
-                        deltaX,
-                        deltaY
+                        click.x(),
+                        click.y(),
+                        click.button(),
+                        offsetX,
+                        offsetY
                 )) {
 
             cir.setReturnValue(true);
@@ -53,9 +53,7 @@ public interface ParentElementMixin {
             cancellable = true
     )
     default void stafftools$onMouseReleased(
-            double mouseX,
-            double mouseY,
-            int button,
+            Click click,
             CallbackInfoReturnable<Boolean> cir
     ) {
 
@@ -65,9 +63,9 @@ public interface ParentElementMixin {
 
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 PlayerActionOverlay.INSTANCE.mouseReleased(
-                        mouseX,
-                        mouseY,
-                        button
+                        click.x(),
+                        click.y(),
+                        click.button()
                 )) {
 
             cir.setReturnValue(true);

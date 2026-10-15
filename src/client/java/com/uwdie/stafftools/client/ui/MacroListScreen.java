@@ -321,9 +321,9 @@ public class MacroListScreen extends StScreen {
         // clip everything to the list viewport
         context.enableScissor(
                 rowLeft + ROW_PAD,
-                LIST_TOP + entranceShift(alpha),
+                LIST_TOP,
                 rowLeft + rowWidth - ROW_PAD,
-                listBottom + entranceShift(alpha)
+                listBottom
         );
 
         for (int i = 0; i < rows.size(); i++) {

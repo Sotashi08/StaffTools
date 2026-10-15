@@ -3,6 +3,7 @@ package com.uwdie.stafftools.client.ui;
 import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 
@@ -224,12 +225,16 @@ public class ThemesScreen extends StScreen {
 
     @Override
     public boolean mouseClicked(
-            double mouseX,
-            double mouseY,
-            int button
+            Click click,
+            boolean doubled
     ) {
 
-        if (button == 0) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
+
+
+if (button == 0) {
 
             for (int i = 0; i < Theme.count(); i++) {
 
@@ -252,6 +257,6 @@ public class ThemesScreen extends StScreen {
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 }

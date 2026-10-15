@@ -21,8 +21,6 @@ public final class NickAliases {
     private static final Map<String, PlayerContext> ALIASES =
             new ConcurrentHashMap<>();
 
-    private static final int MAX_ALIASES = 500;
-
     private NickAliases() {
     }
 
@@ -63,7 +61,7 @@ public final class NickAliases {
                 continue;
             }
 
-            if (ALIASES.size() >= MAX_ALIASES &&
+            if (ALIASES.size() >= 500 &&
                     !ALIASES.containsKey(lower)) {
 
                 continue;

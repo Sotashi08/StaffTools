@@ -4,6 +4,7 @@ import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.punishment.PunishmentHistory;
 import com.uwdie.stafftools.client.punishment.PunishmentRecord;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -139,12 +140,16 @@ public class ActionHistoryScreen extends StScreen {
 
     @Override
     public boolean mouseClicked(
-            double mouseX,
-            double mouseY,
-            int button
+            Click click,
+            boolean doubled
     ) {
 
-        if (button == 0) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
+
+
+if (button == 0) {
 
             PunishmentRecord record =
                     recordAt(mouseX, mouseY);
@@ -162,7 +167,7 @@ public class ActionHistoryScreen extends StScreen {
             }
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 
     /** Record rendered at the given cursor position, or null. */

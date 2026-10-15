@@ -169,12 +169,11 @@ public abstract class StScreen extends Screen {
                 delta
         );
 
-        context.getMatrices().push();
+        context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
                 0,
-                (1 - alpha) * 14,
-                0
+                (1 - alpha) * 14
         );
 
         renderTheme(
@@ -207,7 +206,7 @@ public abstract class StScreen extends Screen {
                 alpha
         );
 
-        context.getMatrices().pop();
+        context.getMatrices().popMatrix();
     }
 
     /** Draws titles, labels, rows and other custom content. */

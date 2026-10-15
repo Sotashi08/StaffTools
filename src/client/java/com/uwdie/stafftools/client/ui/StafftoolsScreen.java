@@ -437,9 +437,9 @@ public class StafftoolsScreen extends StScreen {
                     mixT * 0.75f
             );
 
-            matrices.push();
+            matrices.pushMatrix();
 
-            matrices.translate(x, cy + offY, 0);
+            matrices.translate(x, cy + offY);
 
             context.drawTextWithShadow(
                     textRenderer,
@@ -449,7 +449,7 @@ public class StafftoolsScreen extends StScreen {
                     Ui.argb(color, alpha)
             );
 
-            matrices.pop();
+            matrices.popMatrix();
 
             x += cw;
         }

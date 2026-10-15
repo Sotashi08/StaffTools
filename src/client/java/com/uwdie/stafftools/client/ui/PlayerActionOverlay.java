@@ -528,20 +528,16 @@ public final class PlayerActionOverlay {
         var matrices =
                 context.getMatrices();
 
-        matrices.push();
+        matrices.pushMatrix();
 
         matrices.translate(
                 panelX,
-                panelY + riseY,
-                0
+                panelY + riseY
         );
-
-        matrices.translate(0, 0, 300);
 
         matrices.scale(
                 scale,
-                scale,
-                1
+                scale
         );
 
         Ui.drawPopupFrame(
@@ -608,16 +604,19 @@ public final class PlayerActionOverlay {
         );
 
         // clip the scrolling list so rows never overlap
-        // the header, copy row or footer
-        int clipTop = panelY + PAD + HEADER_H + FIXED_H;
-        int clipBottom = panelY + panelH - PAD - FOOTER_H;
+        // the header, copy row or footer.
+        // Since 1.21.11 the scissor rect is transformed by the current
+        // matrix, so the bounds are given in panel-local coordinates
+        // (not screen ones).
+        int clipTop = PAD + HEADER_H + FIXED_H;
+        int clipBottom = panelH - PAD - FOOTER_H;
 
         if (clipBottom > clipTop) {
 
             context.enableScissor(
                     0,
                     clipTop,
-                    context.getScaledWindowWidth(),
+                    panelW,
                     clipBottom
             );
 
@@ -674,7 +673,7 @@ public final class PlayerActionOverlay {
                 alpha
         );
 
-        matrices.pop();
+        matrices.popMatrix();
     }
 
     /**

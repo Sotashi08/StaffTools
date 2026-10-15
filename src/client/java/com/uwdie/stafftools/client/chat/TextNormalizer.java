@@ -144,7 +144,7 @@ public final class TextNormalizer {
 
             char c = source.charAt(i);
 
-            out[i] = isNameChar(c) ? c : ' ';
+            out[i] = isNameChar(c) ? c : 32;
         }
 
         return new String(out);

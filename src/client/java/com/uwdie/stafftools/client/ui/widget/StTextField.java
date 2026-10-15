@@ -94,12 +94,11 @@ public class StTextField extends TextFieldWidget {
                 focusAmt
         );
 
-        context.getMatrices().push();
+        context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
                 0,
-                (1 - alpha) * 5,
-                0
+                (1 - alpha) * 5
         );
 
         Ui.drawRoundRect(
@@ -122,7 +121,7 @@ public class StTextField extends TextFieldWidget {
                 Ui.argb(border, alpha)
         );
 
-        context.getMatrices().translate(4, 5, 0);
+        context.getMatrices().translate(4, 5);
 
         super.renderWidget(
                 context,
@@ -131,6 +130,6 @@ public class StTextField extends TextFieldWidget {
                 delta
         );
 
-        context.getMatrices().pop();
+        context.getMatrices().popMatrix();
     }
 }

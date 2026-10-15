@@ -9,6 +9,7 @@ import com.uwdie.stafftools.client.macro.PlaceholderRegistry;
 import com.uwdie.stafftools.client.ui.widget.StButton;
 import com.uwdie.stafftools.client.ui.widget.StTextField;
 import com.uwdie.stafftools.client.ui.widget.StToggle;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -454,12 +455,16 @@ public class MacroEditorScreen extends StScreen {
 
     @Override
     public boolean mouseClicked(
-            double mouseX,
-            double mouseY,
-            int button
+            Click click,
+            boolean doubled
     ) {
 
-        if (emojiPicker.mouseClicked(mouseX, mouseY)) {
+        double mouseX = click.x();
+        double mouseY = click.y();
+        int button = click.button();
+
+
+if (emojiPicker.mouseClicked(mouseX, mouseY)) {
             return true;
         }
 
@@ -485,7 +490,7 @@ public class MacroEditorScreen extends StScreen {
             return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseClicked(click, doubled);
     }
 
     @Override

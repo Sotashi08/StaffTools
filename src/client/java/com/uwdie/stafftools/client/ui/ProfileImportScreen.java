@@ -307,9 +307,9 @@ public class ProfileImportScreen extends StScreen {
 
         context.enableScissor(
                 rowLeft + 9,
-                LIST_TOP + shift,
+                LIST_TOP,
                 rowLeft + rowWidth - 9,
-                listBottom + shift
+                listBottom
         );
 
         long now = System.currentTimeMillis();

@@ -7,13 +7,16 @@ import net.minecraft.client.gui.hud.ChatHudLine;
 import net.minecraft.text.OrderedText;
 import net.minecraft.util.math.MathHelper;
 
+import java.util.List;
+
 /**
  * Finds the word the cursor sits on inside a rendered chat line.
  *
  * Vanilla itself resolves the click position to a {@code Style} with
- * exactly this math ({@code ChatHud#getTextStyleAt}); we repeat it to
- * get the whole word back, which makes it possible to react to a click
- * on a nick even when the server did not attach any click event to it.
+ * exactly this math ({@code ChatHud#getTextStyleAt}); 1.21.11 no longer
+ * exposes the line lookup, so the index is computed here from the same
+ * values the renderer uses — chat scale, chat width, line height, the
+ * visible line count and the current scroll offset.
  */
 public final class ChatLinePicker {
 
@@ -42,26 +45,52 @@ public final class ChatLinePicker {
         ChatHudAccessor accessor = (ChatHudAccessor) hud;
 
         // screen coords -> chat line coords (identical to vanilla)
-        double lineX = mouseX / hud.getChatScale() - 4.0;
+        double chatScale = accessor.stafftools$getChatScale();
+
+        double lineX = mouseX / chatScale - 4.0;
 
         double lineY =
                 (client.getWindow().getScaledHeight()
                         - mouseY - 40.0)
-                        / (hud.getChatScale()
+                        / (chatScale
                         * accessor.stafftools$getLineHeight());
 
-        int index = accessor.stafftools$getMessageLineIndex(
-                lineX,
-                lineY
-        );
-
-        if (index < 0) {
+        // chat position resolution only happens with the chat focused
+        // and visible
+        if (!hud.isChatFocused()) {
             return null;
         }
 
-        var visible = accessor.stafftools$getVisibleMessages();
+        // the message background spans exactly [-4, width / scale]
+        double maxX =
+                MathHelper.floor(
+                        accessor.stafftools$getWidth()
+                                / chatScale
+                );
 
-        if (index >= visible.size()) {
+        if (lineX < -4.0 || lineX > maxX) {
+            return null;
+        }
+
+        List<ChatHudLine.Visible> visible =
+                accessor.stafftools$getVisibleMessages();
+
+        // only as many lines as are actually on screen can be hit
+        int visibleCount = Math.min(
+                hud.getVisibleLineCount(),
+                visible.size()
+        );
+
+        if (lineY < 0.0 || lineY >= visibleCount) {
+            return null;
+        }
+
+        // scrolled history shifts the line the cursor points at
+        int index = MathHelper.floor(
+                lineY + accessor.stafftools$getScrolledLines()
+        );
+
+        if (index < 0 || index >= visible.size()) {
             return null;
         }
 
@@ -71,6 +100,7 @@ public final class ChatLinePicker {
             return null;
         }
 
+        // the char index is the floored line X, exactly like vanilla
         int charAt = MathHelper.floor(lineX);
 
         if (charAt < 0) {
