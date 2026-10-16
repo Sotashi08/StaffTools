@@ -33,6 +33,9 @@ public class StaffToolsConfig {
 
     /** Keeps the resized chat size across game starts. */
     private boolean saveChatSize = true;
+
+    /** Decorative frame around the vanilla chat. */
+    private boolean chatFrameEnabled = true;
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
@@ -125,6 +128,15 @@ public class StaffToolsConfig {
 
     public void setSaveChatSize(boolean enabled) {
         this.saveChatSize = enabled;
+    }
+
+    /** Animated frame drawn around the vanilla chat. */
+    public boolean isChatFrameEnabled() {
+        return chatFrameEnabled;
+    }
+
+    public void setChatFrameEnabled(boolean enabled) {
+        this.chatFrameEnabled = enabled;
     }
 
     public boolean isMenuAnimation() {

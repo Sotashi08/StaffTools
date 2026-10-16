@@ -103,6 +103,13 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
+        addToggle(row++, Key.TOGGLE_CHAT_FRAME,
+                config.isChatFrameEnabled(),
+                v -> {
+                    config.setChatFrameEnabled(v);
+                    StafftoolsClient.saveConfig();
+                });
+
         addToggle(row++, Key.TOGGLE_MENU_ANIMATION,
                 config.isMenuAnimation(),
                 v -> {

@@ -57,6 +57,13 @@ public final class ChatResizer {
     private static final int BACKGROUND_PAD_LEFT = 4;
     private static final int BACKGROUND_PAD_RIGHT = 8;
 
+    /**
+     * How far the drawn frame is pushed away from the chat area on the
+     * top and the bottom, so it never sits on a message itself. Left and
+     * right are the chat's own edges: no text runs there.
+     */
+    private static final int FRAME_INSET = 2;
+
     /** Vanilla maxima: 1.0 on the sliders. */
     private static final int MAX_WIDTH_PX =
             MathHelper.floor(WIDTH_BASE + WIDTH_SPAN);
@@ -134,16 +141,6 @@ public final class ChatResizer {
         }
 
         return true;
-    }
-
-    /** Current live area, or null when there is nothing to grab. */
-    private static Area gripArea() {
-
-        if (!usable()) {
-            return null;
-        }
-
-        return chatArea();
     }
 
     // ------------------------------------------------------------------
@@ -384,6 +381,38 @@ public final class ChatResizer {
                 mouseY <= area.top() + GRIP_SIZE + 2;
     }
 
+    /**
+     * The rectangle the frame and the grip live in: the chat area pushed
+     * up and down by {@link #FRAME_INSET}, so the frame lines never land
+     * on a message. Never leaves the screen.
+     */
+    private static Area frameOf(Area chat) {
+
+        return new Area(
+                chat.left(),
+                Math.max(0, chat.top() - FRAME_INSET),
+                chat.right(),
+                Math.min(
+                        MinecraftClient.getInstance()
+                                .getWindow()
+                                .getScaledHeight(),
+                        chat.bottom() + FRAME_INSET
+                )
+        );
+    }
+
+    /** Area the grip is hit-tested and drawn on. */
+    private static Area gripArea() {
+
+        if (!usable()) {
+            return null;
+        }
+
+        Area chat = chatArea();
+
+        return chat == null ? null : frameOf(chat);
+    }
+
     // ------------------------------------------------------------------
     // input
     // ------------------------------------------------------------------
@@ -469,7 +498,7 @@ public final class ChatResizer {
             return false;
         }
 
-        Area area = chatArea();
+        Area area = gripArea();
 
         if (area == null || !overGrip(area, mouseX, mouseY)) {
             return false;
@@ -623,8 +652,10 @@ public final class ChatResizer {
         applyWidth(localWidth * scale);
 
         // --- height: invert the top edge, one chat line at a time -----
+        // the grip sits on the frame, which is FRAME_INSET above the
+        // chat area itself
         int wantedTop = clampPixel(
-                (int) Math.round(mouseY),
+                (int) Math.round(mouseY) + FRAME_INSET,
                 SCREEN_MARGIN,
                 Math.max(SCREEN_MARGIN, bottom - MIN_HEIGHT_PX)
         );
@@ -813,28 +844,39 @@ public final class ChatResizer {
     // ------------------------------------------------------------------
 
     /**
-     * Draws the chat frame and the corner grip. Only called while the
-     * chat screen is open, where the focused layout is the one you see.
+     * Draws the animated chat frame: a resting hairline, the orbit bars
+     * that the menus use (in their light preset — the chat perimeter is
+     * huge, so this one is deliberately the cheapest) and thin accent
+     * ribbons top and bottom. No glass body or shadow: the chat has to
+     * stay readable.
+     *
+     * The whole frame sits {@link #FRAME_INSET} pixels away from the chat
+     * area on the top and the bottom, so it never covers a message. It
+     * can be switched off in the main settings.
      */
-    public void render(
+    public void renderFrame(
             DrawContext context,
             int mouseX,
             int mouseY
     ) {
 
-        if (!enabled() || !usable()) {
-            return;
-        }
+        StaffToolsConfig config = config();
 
-        MinecraftClient client = MinecraftClient.getInstance();
-
-        Area area = chatArea();
-
-        if (area == null || area.width() < GRIP_SIZE ||
-                area.height() < GRIP_SIZE) {
+        if (!enabled() || !usable() ||
+                config == null || !config.isChatFrameEnabled()) {
 
             return;
         }
+
+        Area chat = chatArea();
+
+        if (chat == null || chat.width() < GRIP_SIZE ||
+                chat.height() < GRIP_SIZE) {
+
+            return;
+        }
+
+        Area area = frameOf(chat);
 
         boolean hovered = resizing || overGrip(area, mouseX, mouseY);
 
@@ -857,6 +899,94 @@ public final class ChatResizer {
                 3,
                 Ui.argb(frame, alpha)
         );
+
+        // the orbit animation of the menu / popup frames, trimmed down
+        // for a chat-sized perimeter
+        Ui.drawOrbitFrame(
+                context,
+                area.left(),
+                area.top(),
+                area.width(),
+                area.height(),
+                alpha,
+                Ui.OrbitStyle.CHAT
+        );
+
+        // accent ribbons, one pixel at the top and at the bottom of the
+        // frame, echoing the popup frame
+        if (area.width() > 12) {
+
+            Ui.drawGradientH(
+                    context,
+                    area.left() + 3,
+                    area.top() + 2,
+                    area.width() - 6,
+                    1,
+                    Ui.ACCENT,
+                    Ui.ACCENT_2,
+                    alpha * 0.7f
+            );
+
+            Ui.drawGradientH(
+                    context,
+                    area.left() + 3,
+                    area.bottom() - 3,
+                    area.width() - 6,
+                    1,
+                    Ui.ACCENT_2,
+                    Ui.ACCENT,
+                    alpha * 0.35f
+            );
+        }
+    }
+
+    /**
+     * Draws the corner grip and the size readout. Drawn after everything
+     * else (the actions popup included), so the grip stays reachable no
+     * matter what is on top of the frame.
+     *
+     * With the frame switched off the grip only shows while it is
+     * actually used: nothing of the mod stays on screen, but resizing
+     * keeps working.
+     */
+    public void renderGrip(
+            DrawContext context,
+            int mouseX,
+            int mouseY
+    ) {
+
+        if (!enabled() || !usable()) {
+            return;
+        }
+
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        Area chat = chatArea();
+
+        if (chat == null || chat.width() < GRIP_SIZE ||
+                chat.height() < GRIP_SIZE) {
+
+            return;
+        }
+
+        Area area = frameOf(chat);
+
+        boolean hovered = resizing || overGrip(area, mouseX, mouseY);
+
+        StaffToolsConfig config = config();
+
+        boolean framed = config != null && config.isChatFrameEnabled();
+
+        // frame off: the grip fades in only while something happens
+        if (!framed && !hovered) {
+            return;
+        }
+
+        float alpha = resizing
+                ? 1f
+                : hovered
+                        ? 0.9f
+                        : 0.55f;
 
         // grip in the top-right corner (the chat grows to the left/up)
         int gx = area.right() - GRIP_SIZE;

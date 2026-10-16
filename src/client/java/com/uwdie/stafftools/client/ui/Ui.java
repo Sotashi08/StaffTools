@@ -1,6 +1,7 @@
 package com.uwdie.stafftools.client.ui;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
+import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.sound.PositionedSoundInstance;
@@ -670,6 +671,21 @@ public final class Ui {
                         3, 1,
                         0.09f, 0.24f
                 );
+
+        /**
+         * The chat frame: the same animation on a much bigger perimeter,
+         * trimmed to keep the per-frame cost down. The bar length is
+         * capped lower, the halo is one pixel thinner and the wide glow
+         * is barely visible — a chat log is read line by line, the frame
+         * has to stay a frame.
+         */
+        public static final OrbitStyle CHAT =
+                new OrbitStyle(
+                        2, 3, 2,
+                        16, 48, 14,
+                        2, 1,
+                        0.08f, 0.22f
+                );
     }
 
     /**
@@ -736,8 +752,7 @@ public final class Ui {
 
         // one global switch: the animation may be turned off in the
         // main menu, which also covers the popup frames
-        if (!StafftoolsClient.getConfig()
-                .isMenuAnimation()) {
+        if (!menuAnimationEnabled()) {
 
             return;
         }
@@ -928,6 +943,21 @@ public final class Ui {
 
         // ... flatten into a plateau instead of a hard peak
         return up * (1f - 0.12f * smoothstep(0.86f, 1f, m));
+    }
+
+    /**
+     * Frame animation switch, null-safe: the orbit frames are also drawn
+     * from the chat gizmo, which can render before the config is ready.
+     */
+    private static boolean menuAnimationEnabled() {
+
+        try {
+            StaffToolsConfig config = StafftoolsClient.getConfig();
+
+            return config != null && config.isMenuAnimation();
+        } catch (RuntimeException notReadyYet) {
+            return true;
+        }
     }
 
     public static void drawHeader(

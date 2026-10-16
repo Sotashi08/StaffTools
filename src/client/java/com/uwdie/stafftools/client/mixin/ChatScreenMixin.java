@@ -48,6 +48,10 @@ public class ChatScreenMixin {
             CallbackInfo ci
     ) {
 
+        // the animated chat frame sits under everything else, so the
+        // actions popup floats on top of it
+        ChatResizer.INSTANCE.renderFrame(context, mouseX, mouseY);
+
         PlayerActionOverlay.INSTANCE.render(
                 context,
                 mouseX,
@@ -57,8 +61,9 @@ public class ChatScreenMixin {
 
         Toasts.INSTANCE.render(context);
 
-        // recorded last: the resize gizmo sits above everything else
-        ChatResizer.INSTANCE.render(context, mouseX, mouseY);
+        // the grip itself is drawn last: it has to stay clickable even
+        // when the popup happens to cover the corner
+        ChatResizer.INSTANCE.renderGrip(context, mouseX, mouseY);
     }
 
     /**

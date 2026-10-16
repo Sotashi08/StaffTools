@@ -100,6 +100,8 @@ public final class Lang {
                 "toggle.savePopupSize";
         public static final String TOGGLE_SAVE_CHAT_SIZE =
                 "toggle.saveChatSize";
+        public static final String TOGGLE_CHAT_FRAME =
+                "toggle.chatFrame";
         public static final String TOGGLE_MENU_ANIMATION =
                 "toggle.menuAnimation";
         public static final String TOGGLE_CHAT_RESIZE =
@@ -394,6 +396,7 @@ public final class Lang {
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
         ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
         ru.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Сохранять размер чата");
+        ru.put(Key.TOGGLE_CHAT_FRAME, "Рамка вокруг чата");
         ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
         ru.put(Key.TOGGLE_CHAT_RESIZE, "Изменение размера чата");
 
@@ -601,6 +604,7 @@ public final class Lang {
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
         en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
         en.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Save chat size");
+        en.put(Key.TOGGLE_CHAT_FRAME, "Frame around the chat");
         en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
         en.put(Key.TOGGLE_CHAT_RESIZE, "Chat resize handle");
 
