@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class NickAliases {
 
+
     private static final Map<String, PlayerContext> ALIASES =
             new ConcurrentHashMap<>();
 
