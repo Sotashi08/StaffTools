@@ -25,6 +25,17 @@ public abstract class StScreen extends Screen {
 
     private int slotCounter;
 
+    /**
+     * Stagger counter for the widget entrance. It MUST be cleared on
+     * every rebuild: screens are re-entered through parent links and
+     * {@code setScreen} re-runs init() on the same instance, so without
+     * a reset every visit would push the buttons further away in time.
+     */
+    protected void resetSlots() {
+
+        slotCounter = 0;
+    }
+
     protected StScreen(Text title) {
         super(title);
     }

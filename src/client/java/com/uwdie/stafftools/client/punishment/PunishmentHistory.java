@@ -4,21 +4,30 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ServerInfo;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Stores the full punishment history, auto-detects the punishment type from
  * sent commands and captures the server's chat response when possible.
+ *
+ * Every record is tagged with the raw address of the server it was issued
+ * on, and each address gets a {@link ServerProfile} the user may name.
+ * The log is then either read as one shared journal or filtered down to
+ * one server.
  */
 public final class PunishmentHistory {
 
     private static final int MAX_RECORDS = 300;
+
     private static final Type LIST_TYPE =
             new TypeToken<List<PunishmentRecord>>() {
             }.getType();
@@ -31,8 +40,20 @@ public final class PunishmentHistory {
     private static PunishmentHistory instance;
 
     private final Path path;
+
     private final List<PunishmentRecord> records =
             new ArrayList<>();
+
+    /** Servers seen so far, keyed by raw address. */
+    private final Map<String, ServerProfile> servers =
+            new LinkedHashMap<>();
+
+    /** File layout: before per-server support it was a bare record list. */
+    private static class Store {
+
+        private List<PunishmentRecord> records = new ArrayList<>();
+        private List<ServerProfile> servers = new ArrayList<>();
+    }
 
     /**
      * Macro or action that is currently being executed, so every record
@@ -80,8 +101,13 @@ public final class PunishmentHistory {
                 );
             }
 
+            record.setServerKey(currentServerKey());
+
             record.setSourceName(consumeSource());
             record.setSourceKind(consumeKind());
+
+            rememberServer(record.getServerKey());
+            rememberServer(currentSessionServer().getKey());
 
             records.add(0, record);
             trim();
@@ -89,6 +115,30 @@ public final class PunishmentHistory {
         }
 
         expireMacro();
+    }
+
+    /** Raw address of the server the client is on right now. */
+    public static String currentServerKey() {
+        return currentSessionServer().getKey();
+    }
+
+    /** Server of the session, with a placeholder when not connected. */
+    public static ServerProfile currentSessionServer() {
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        ServerInfo entry = client.getCurrentServerEntry();
+
+        if (entry == null) {
+            return new ServerProfile("", "", 0L);
+        }
+
+        String address = entry.address == null ? "" : entry.address;
+
+        return new ServerProfile(
+                address,
+                address,
+                0L
+        );
     }
 
     /**
@@ -199,8 +249,12 @@ public final class PunishmentHistory {
             }
 
             // A broadcast about another staff member's punishment
-            // must never resolve OUR pending record.
-            if (foreignIssued) {
+            // must never resolve OUR pending record. Only entries of
+            // the server we are on right now may be answered by it.
+            if (foreignIssued ||
+                    !record.getServerKey()
+                            .equals(currentServerKey())) {
+
                 continue;
             }
 
@@ -280,12 +334,125 @@ public final class PunishmentHistory {
         save();
     }
 
+    // ------------------------------------------------------------------
+    // servers
+    // ------------------------------------------------------------------
+
+    /** Makes sure a server entry exists for an address. */
+    private void rememberServer(String key) {
+
+        if (key == null || key.isBlank()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+
+        ServerProfile existing = servers.get(key);
+
+        if (existing == null) {
+
+            ServerProfile profile =
+                    new ServerProfile(key, key, now);
+
+            servers.put(key, profile);
+        } else {
+            existing.touch(now);
+        }
+    }
+
+    /** Servers the log knows about, newest touched first. */
+    public List<ServerProfile> getServers() {
+
+        List<ServerProfile> list =
+                new ArrayList<>(servers.values());
+
+        list.sort((a, b) ->
+                Long.compare(b.getLastSeen(), a.getLastSeen()));
+
+        return list;
+    }
+
+    /** Display name of a server address, or the address itself. */
+    public String serverName(String key) {
+
+        ServerProfile profile = servers.get(key);
+
+        return profile == null
+                ? (key == null || key.isBlank() ? "—" : key)
+                : profile.getName();
+    }
+
+    /** Renames a server; unknown addresses are created on the fly. */
+    public void renameServer(String key, String name) {
+
+        if (key == null || key.isBlank()) {
+            return;
+        }
+
+        rememberServer(key);
+
+        servers.get(key).setName(name);
+
+        save();
+    }
+
+    /** Drops a server entry: the address itself is never lost. */
+    public void forgetServer(String key) {
+
+        if (key != null && servers.remove(key) != null) {
+            save();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // reading the log
+    // ------------------------------------------------------------------
+
     public List<PunishmentRecord> getRecords() {
         return List.copyOf(records);
     }
 
+    /** The shared journal: every server together. */
+    public List<PunishmentRecord> getRecordsOf() {
+        return getRecords();
+    }
+
+    /** Only the records issued on one server. */
+    public List<PunishmentRecord> getRecordsOf(String serverKey) {
+
+        if (serverKey == null || serverKey.isBlank()) {
+            return getRecords();
+        }
+
+        List<PunishmentRecord> out = new ArrayList<>();
+
+        for (PunishmentRecord record : records) {
+
+            if (serverKey.equals(record.getServerKey())) {
+                out.add(record);
+            }
+        }
+
+        return out;
+    }
+
     public void clear() {
         records.clear();
+        save();
+    }
+
+    /** Clears only one server's log, leaving the rest untouched. */
+    public void clearServer(String serverKey) {
+
+        if (serverKey == null || serverKey.isBlank()) {
+            return;
+        }
+
+        records.removeIf(record ->
+                serverKey.equals(record.getServerKey()));
+
+        forgetServer(serverKey);
+
         save();
     }
 
@@ -303,17 +470,62 @@ public final class PunishmentHistory {
             }
 
             String json = Files.readString(path);
+            String trimmed = json.trim();
 
-            List<PunishmentRecord> loaded =
-                    GSON.fromJson(json, LIST_TYPE);
-
-            if (loaded != null) {
-
-                records.clear();
-                records.addAll(loaded);
-
-                trim();
+            // files written before per-server history were a bare list
+            if (trimmed.isEmpty()) {
+                return;
             }
+
+            if (trimmed.charAt(0) == '[') {
+
+                List<PunishmentRecord> loaded =
+                        GSON.fromJson(trimmed, LIST_TYPE);
+
+                if (loaded != null) {
+
+                    records.clear();
+                    records.addAll(loaded);
+
+                    for (PunishmentRecord record : records) {
+                        rememberServer(record.getServerKey());
+                    }
+
+                    trim();
+                }
+
+                return;
+            }
+
+            Store store = GSON.fromJson(trimmed, Store.class);
+
+            if (store == null) {
+                return;
+            }
+
+            records.clear();
+
+            if (store.records != null) {
+                records.addAll(store.records);
+            }
+
+            servers.clear();
+
+            if (store.servers != null) {
+                for (ServerProfile profile : store.servers) {
+                    if (profile.getKey() != null &&
+                            !profile.getKey().isBlank()) {
+
+                        servers.put(profile.getKey(), profile);
+                    }
+                }
+            }
+
+            for (PunishmentRecord record : records) {
+                rememberServer(record.getServerKey());
+            }
+
+            trim();
 
         } catch (Exception e) {
             System.err.println(
@@ -327,9 +539,14 @@ public final class PunishmentHistory {
 
             Files.createDirectories(path.getParent());
 
+            Store store = new Store();
+
+            store.records = records;
+            store.servers = new ArrayList<>(servers.values());
+
             Files.writeString(
                     path,
-                    GSON.toJson(records)
+                    GSON.toJson(store, Store.class)
             );
 
         } catch (IOException e) {

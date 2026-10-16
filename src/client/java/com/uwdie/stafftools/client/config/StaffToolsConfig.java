@@ -36,6 +36,12 @@ public class StaffToolsConfig {
 
     /** Decorative frame around the vanilla chat. */
     private boolean chatFrameEnabled = true;
+
+    /** Moderator HUD that pops up together with the chat. */
+    private boolean modHudEnabled = true;
+
+    /** Rotating funny phrases inside the moderator HUD. */
+    private boolean modHudPhrases = true;
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
@@ -137,6 +143,24 @@ public class StaffToolsConfig {
 
     public void setChatFrameEnabled(boolean enabled) {
         this.chatFrameEnabled = enabled;
+    }
+
+    /** Moderator HUD that appears while the chat is open. */
+    public boolean isModHudEnabled() {
+        return modHudEnabled;
+    }
+
+    public void setModHudEnabled(boolean enabled) {
+        this.modHudEnabled = enabled;
+    }
+
+    /** Funny phrases inside the moderator HUD. */
+    public boolean isModHudPhrases() {
+        return modHudPhrases;
+    }
+
+    public void setModHudPhrases(boolean enabled) {
+        this.modHudPhrases = enabled;
     }
 
     public boolean isMenuAnimation() {

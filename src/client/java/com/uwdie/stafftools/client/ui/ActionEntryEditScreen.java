@@ -102,6 +102,8 @@ public class ActionEntryEditScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         panelW = Math.min(formWidth(), 330);
         panelX = (width - panelW) / 2;
 
@@ -455,8 +457,7 @@ public class ActionEntryEditScreen extends StScreen {
         double mouseY = click.y();
         int button = click.button();
 
-
-if (emojiPicker.mouseClicked(mouseX, mouseY)) {
+        if (emojiPicker.mouseClicked(mouseX, mouseY)) {
             return true;
         }
 

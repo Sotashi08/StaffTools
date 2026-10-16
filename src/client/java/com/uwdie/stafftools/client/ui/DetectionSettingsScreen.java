@@ -74,6 +74,8 @@ public class DetectionSettingsScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         rows.clear();
         clearChildren();
 

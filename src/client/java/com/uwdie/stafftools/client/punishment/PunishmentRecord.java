@@ -14,6 +14,9 @@ public class PunishmentRecord {
     private PunishmentStatus status;
     private String response;
 
+    /** Raw address of the server the punishment was issued on. */
+    private String serverKey = "";
+
     /** Local staff member who issued the punishment. */
     private String moderator;
 
@@ -117,6 +120,17 @@ public class PunishmentRecord {
 
     public String getResponse() {
         return response;
+    }
+
+    /** Raw address of the server the punishment was issued on. */
+    public String getServerKey() {
+        return serverKey == null || serverKey.isBlank()
+                ? ""
+                : serverKey;
+    }
+
+    public void setServerKey(String serverKey) {
+        this.serverKey = serverKey == null ? "" : serverKey;
     }
 
     /** Local staff member who issued the punishment. */

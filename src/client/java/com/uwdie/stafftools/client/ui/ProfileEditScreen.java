@@ -78,6 +78,8 @@ public class ProfileEditScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         clearChildren();
 
         StaffToolsConfig config = StafftoolsClient.getConfig();
@@ -221,8 +223,7 @@ public class ProfileEditScreen extends StScreen {
         double mouseY = click.y();
         int button = click.button();
 
-
-if (button == 0 &&
+        if (button == 0 &&
                 mouseY >= THEME_Y &&
                 mouseY <= THEME_Y + 16) {
 

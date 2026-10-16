@@ -88,6 +88,8 @@ public class ProfilesScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         rows.clear();
         clearChildren();
 
@@ -230,8 +232,7 @@ public class ProfilesScreen extends StScreen {
         double mouseY = click.y();
         int button = click.button();
 
-
-if (button == 0) {
+        if (button == 0) {
 
             Row row = rowAt(mouseX, mouseY);
 

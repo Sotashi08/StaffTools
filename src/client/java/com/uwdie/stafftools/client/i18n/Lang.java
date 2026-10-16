@@ -60,6 +60,7 @@ public final class Lang {
         public static final String BTN_THEMES = "btn.themes";
         public static final String BTN_DETECTION = "btn.detection";
         public static final String BTN_PROFILES = "btn.profiles";
+        public static final String BTN_SETTINGS = "btn.settings";
 
         // Titles / hints
         public static final String TITLE_DETECTION = "title.detection";
@@ -102,6 +103,10 @@ public final class Lang {
                 "toggle.saveChatSize";
         public static final String TOGGLE_CHAT_FRAME =
                 "toggle.chatFrame";
+        public static final String TOGGLE_MOD_HUD =
+                "toggle.modHud";
+        public static final String TOGGLE_MOD_HUD_PHRASES =
+                "toggle.modHudPhrases";
         public static final String TOGGLE_MENU_ANIMATION =
                 "toggle.menuAnimation";
         public static final String TOGGLE_CHAT_RESIZE =
@@ -172,6 +177,34 @@ public final class Lang {
         public static final String OVERLAY_COPY_NAME = "overlay.copyName";
         public static final String OVERLAY_DUP_CHAT = "overlay.dupChat";
         public static final String OVERLAY_ALIAS_TITLE = "overlay.aliasTitle";
+
+        // Settings screen
+        public static final String TITLE_SETTINGS = "title.settings";
+        public static final String TITLE_SERVER_RENAME =
+                "title.serverRename";
+        public static final String LABEL_SERVER_NAME = "label.serverName";
+        public static final String LABEL_SERVER_KEY = "label.serverKey";
+
+        // History sidebar + filters
+        public static final String HIST_SERVERS = "hist.servers";
+        public static final String HIST_ALL_SERVERS = "hist.allServers";
+        public static final String HIST_COL_SERVER = "hist.colServer";
+        public static final String HIST_FILTER_TYPE = "hist.filterType";
+        public static final String HIST_FILTER_STATUS = "hist.filterStatus";
+        public static final String HIST_FILTER_ALL = "hist.filterAll";
+        public static final String HIST_FILTER_RESET = "hist.filterReset";
+        public static final String HIST_FILTER_NICK_HINT =
+                "hist.filterNick";
+        public static final String BTN_HIST_CLEAR_ONE =
+                "btn.histClearOne";
+
+        // Moderator HUD
+        public static final String HUD_TITLE = "hud.title";
+        public static final String HUD_MODERATOR = "hud.moderator";
+        public static final String HUD_SERVER = "hud.server";
+        public static final String HUD_SESSION = "hud.session";
+        public static final String HUD_PUNISHED = "hud.punished";
+        public static final String HUD_OFFLINE = "hud.offline";
 
         // Chat hover
         public static final String HOVER_CLICK = "hover.click";
@@ -394,9 +427,12 @@ public final class Lang {
         ru.put(Key.TOGGLE_LANGUAGE, "Язык");
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
-        ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
+        ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попапа");
         ru.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Сохранять размер чата");
         ru.put(Key.TOGGLE_CHAT_FRAME, "Рамка вокруг чата");
+        ru.put(Key.TOGGLE_MOD_HUD, "HUD модератора в чате");
+        ru.put(Key.TOGGLE_MOD_HUD_PHRASES, "Фразы в HUD модератора");
+        ru.put(Key.BTN_SETTINGS, "Настройки");
         ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
         ru.put(Key.TOGGLE_CHAT_RESIZE, "Изменение размера чата");
 
@@ -496,6 +532,25 @@ public final class Lang {
         ru.put(Key.STAT_BY_TYPE, "По типам");
         ru.put(Key.STAT_FROM_ACTIONS, "Из действий");
         ru.put(Key.HIST_COL_STATUS, "Статус");
+        ru.put(Key.HIST_COL_SERVER, "Сервер");
+        ru.put(Key.HIST_SERVERS, "Серверы");
+        ru.put(Key.HIST_ALL_SERVERS, "Все серверы");
+        ru.put(Key.HIST_FILTER_TYPE, "Тип");
+        ru.put(Key.HIST_FILTER_STATUS, "Статус");
+        ru.put(Key.HIST_FILTER_ALL, "все");
+        ru.put(Key.HIST_FILTER_RESET, "Сброс");
+        ru.put(Key.HIST_FILTER_NICK_HINT, "ник игрока…");
+        ru.put(Key.BTN_HIST_CLEAR_ONE, "Очистить этот");
+        ru.put(Key.TITLE_SETTINGS, "Настройки");
+        ru.put(Key.TITLE_SERVER_RENAME, "Название сервера");
+        ru.put(Key.LABEL_SERVER_NAME, "Название");
+        ru.put(Key.LABEL_SERVER_KEY, "Адрес");
+        ru.put(Key.HUD_TITLE, "Модератор");
+        ru.put(Key.HUD_MODERATOR, "Модератор");
+        ru.put(Key.HUD_SERVER, "Сервер");
+        ru.put(Key.HUD_SESSION, "В сессии");
+        ru.put(Key.HUD_PUNISHED, "Наказаний");
+        ru.put(Key.HUD_OFFLINE, "не в игре");
         ru.put(Key.HIST_HINT_CLICK, "Нажмите на запись — подробности");
 
 
@@ -602,9 +657,12 @@ public final class Lang {
         en.put(Key.TOGGLE_LANGUAGE, "Language");
         en.put(Key.TOGGLE_TOASTS, "Notifications");
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
-        en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
+        en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save popup size");
         en.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Save chat size");
         en.put(Key.TOGGLE_CHAT_FRAME, "Frame around the chat");
+        en.put(Key.TOGGLE_MOD_HUD, "Moderator HUD in chat");
+        en.put(Key.TOGGLE_MOD_HUD_PHRASES, "Phrases in the moderator HUD");
+        en.put(Key.BTN_SETTINGS, "Settings");
         en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
         en.put(Key.TOGGLE_CHAT_RESIZE, "Chat resize handle");
 
@@ -704,6 +762,25 @@ public final class Lang {
         en.put(Key.STAT_BY_TYPE, "By type");
         en.put(Key.STAT_FROM_ACTIONS, "From actions");
         en.put(Key.HIST_COL_STATUS, "Status");
+        en.put(Key.HIST_COL_SERVER, "Server");
+        en.put(Key.HIST_SERVERS, "Servers");
+        en.put(Key.HIST_ALL_SERVERS, "All servers");
+        en.put(Key.HIST_FILTER_TYPE, "Type");
+        en.put(Key.HIST_FILTER_STATUS, "Status");
+        en.put(Key.HIST_FILTER_ALL, "all");
+        en.put(Key.HIST_FILTER_RESET, "Reset");
+        en.put(Key.HIST_FILTER_NICK_HINT, "player nick…");
+        en.put(Key.BTN_HIST_CLEAR_ONE, "Clear this");
+        en.put(Key.TITLE_SETTINGS, "Settings");
+        en.put(Key.TITLE_SERVER_RENAME, "Server name");
+        en.put(Key.LABEL_SERVER_NAME, "Name");
+        en.put(Key.LABEL_SERVER_KEY, "Address");
+        en.put(Key.HUD_TITLE, "Moderator");
+        en.put(Key.HUD_MODERATOR, "Moderator");
+        en.put(Key.HUD_SERVER, "Server");
+        en.put(Key.HUD_SESSION, "Session");
+        en.put(Key.HUD_PUNISHED, "Punishments");
+        en.put(Key.HUD_OFFLINE, "not in game");
         en.put(Key.HIST_HINT_CLICK, "Click an entry for details");
 
         en.put(Key.DETAIL_TITLE, "Punishment details");

@@ -39,6 +39,9 @@ public class PunishmentDetailScreen extends StScreen {
     private final Screen parent;
     private final PunishmentRecord record;
 
+    /** Server the entry belongs to; null when the history is unfiltered. */
+    private final String serverKey;
+
     private final SimpleDateFormat dateFormat =
             new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
 
@@ -55,14 +58,27 @@ public class PunishmentDetailScreen extends StScreen {
             PunishmentRecord record
     ) {
 
+        this(parent, record, null);
+    }
+
+    /** @param serverKey of the view that opened this entry, if any. */
+    public PunishmentDetailScreen(
+            Screen parent,
+            PunishmentRecord record,
+            String serverKey
+    ) {
+
         super(Lang.text(Key.DETAIL_TITLE));
 
         this.parent = parent;
         this.record = record;
+        this.serverKey = serverKey;
     }
 
     @Override
     protected void init() {
+
+        resetSlots();
 
         clearChildren();
 
@@ -86,7 +102,14 @@ public class PunishmentDetailScreen extends StScreen {
                 120,
                 20,
                 Key.BTN_BACK,
-                b -> client.setScreen(parent)
+                b -> client.setScreen(
+                        serverKey == null
+                                ? parent
+                                : new ActionHistoryScreen(
+                                        this,
+                                        serverKey
+                                )
+                )
         );
     }
 

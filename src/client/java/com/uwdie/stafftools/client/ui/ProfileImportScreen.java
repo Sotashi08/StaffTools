@@ -52,6 +52,8 @@ public class ProfileImportScreen extends StScreen {
 
     @Override
     protected void init() {
+        resetSlots();
+
         rebuild();
     }
 

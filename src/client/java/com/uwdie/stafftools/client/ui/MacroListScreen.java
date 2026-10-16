@@ -68,6 +68,8 @@ public class MacroListScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         // NOTE: openTime is deliberately NOT reset here — the entrance
         // animation must play once per screen instance (entering the
         // list, or coming back from the editor), never on a rebuild.

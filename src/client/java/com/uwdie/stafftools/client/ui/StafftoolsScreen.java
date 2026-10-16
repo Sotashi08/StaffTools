@@ -1,7 +1,6 @@
 package com.uwdie.stafftools.client.ui;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
-import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.ui.widget.StButton;
@@ -42,6 +41,8 @@ public class StafftoolsScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         colX = (width - COL_W) / 2;
 
         contentTop = 96;
@@ -63,59 +64,10 @@ public class StafftoolsScreen extends StScreen {
         addNavButton(row++, "\uD83D\uDC64 ", Key.BTN_PROFILES, () ->
                 client.setScreen(new ProfilesScreen(this)));
 
+        addNavButton(row++, "⚙ ", Key.BTN_SETTINGS, () ->
+                client.setScreen(new SettingsScreen(this)));
+
         row++;
-
-        StaffToolsConfig config =
-                StafftoolsClient.getConfig();
-
-        addToggle(row++, Key.TOGGLE_ACTIONS_POPUP,
-                config.isPlayerActionsEnabled(),
-                v -> {
-                    config.setPlayerActionsEnabled(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_CONFIRM_DANGER,
-                config.isDangerousMacroConfirmation(),
-                v -> {
-                    config.setDangerousMacroConfirmation(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_TOASTS,
-                config.isToastsEnabled(),
-                v -> {
-                    config.setToastsEnabled(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_SAVE_POPUP_SIZE,
-                config.isSavePopupSize(),
-                v -> {
-                    config.setSavePopupSize(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_SAVE_CHAT_SIZE,
-                config.isSaveChatSize(),
-                v -> {
-                    config.setSaveChatSize(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_CHAT_FRAME,
-                config.isChatFrameEnabled(),
-                v -> {
-                    config.setChatFrameEnabled(v);
-                    StafftoolsClient.saveConfig();
-                });
-
-        addToggle(row++, Key.TOGGLE_MENU_ANIMATION,
-                config.isMenuAnimation(),
-                v -> {
-                    config.setMenuAnimation(v);
-                    StafftoolsClient.saveConfig();
-                });
 
         button(
                 colX,
@@ -180,24 +132,6 @@ public class StafftoolsScreen extends StScreen {
                         nextSlot(),
                         Ui.ACCENT
                 )
-        );
-    }
-
-    private void addToggle(
-            int row,
-            String key,
-            boolean initial,
-            java.util.function.Consumer<Boolean> onChange
-    ) {
-
-        toggle(
-                colX,
-                contentTop + row * ROW_STEP,
-                COL_W,
-                WIDGET_H,
-                key,
-                initial,
-                onChange
         );
     }
 

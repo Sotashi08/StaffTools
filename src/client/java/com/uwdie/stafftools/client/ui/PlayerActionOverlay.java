@@ -37,7 +37,7 @@ public final class PlayerActionOverlay {
     private static final int HEADER_H = 30;
     private static final int FIXED_H = 20;
     private static final int FIXED_GAP = 3;
-    private static final int FOOTER_H = 26;
+    private static final int FOOTER_H = 13;
     private static final int ROW_H = 16;
     private static final int ROW_GAP = 4;
     private static final int SEP_H = 15;
@@ -1313,9 +1313,6 @@ public final class PlayerActionOverlay {
                         " • " +
                         Lang.t(Key.OVERLAY_HINT_SCROLL);
 
-        String line2 =
-                Lang.t(Key.OVERLAY_HINT_DRAG);
-
         context.drawCenteredTextWithShadow(
                 tr,
                 Text.literal(
@@ -1325,19 +1322,6 @@ public final class PlayerActionOverlay {
                 panelH - PAD - 9,
                 Ui.argb(0xFF556070, alpha)
         );
-
-        if (!line2.isEmpty()) {
-
-            context.drawCenteredTextWithShadow(
-                    tr,
-                    Text.literal(
-                            tr.trimToWidth(line2, panelW - PAD * 2)
-                    ),
-                    panelW / 2,
-                    panelH - PAD + 2,
-                    Ui.argb(0xFF5A6A80, alpha)
-            );
-        }
     }
 
     /**

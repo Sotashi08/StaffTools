@@ -9,6 +9,7 @@ import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
 import com.uwdie.stafftools.client.ui.ChatResizer;
+import com.uwdie.stafftools.client.ui.ModeratorHud;
 import com.uwdie.stafftools.client.ui.Toasts;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -64,6 +65,9 @@ public class ChatScreenMixin {
         // the grip itself is drawn last: it has to stay clickable even
         // when the popup happens to cover the corner
         ChatResizer.INSTANCE.renderGrip(context, mouseX, mouseY);
+
+        // moderator panel: own layer, fades in with the chat
+        ModeratorHud.INSTANCE.render(context, mouseX, mouseY);
     }
 
     /**
@@ -77,6 +81,7 @@ public class ChatScreenMixin {
     private void stafftools$onRemoved(CallbackInfo ci) {
 
         ChatResizer.INSTANCE.cancel();
+        ModeratorHud.INSTANCE.mouseReleased();
     }
 
     /**
@@ -236,6 +241,12 @@ public class ChatScreenMixin {
 
         double mouseX = click.x();
         double mouseY = click.y();
+
+        // the moderator panel is draggable and floats above the chat
+        if (ModeratorHud.INSTANCE.mouseClicked(mouseX, mouseY)) {
+            cir.setReturnValue(true);
+            return;
+        }
 
         // chat-input nick detection has priority over everything:
         // click on a hand-typed online nick -> actions popup

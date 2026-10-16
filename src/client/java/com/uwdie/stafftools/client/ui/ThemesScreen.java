@@ -29,6 +29,8 @@ public class ThemesScreen extends StScreen {
     @Override
     protected void init() {
 
+        resetSlots();
+
         // widgets must be created HERE, once per screen open —
         // building them in renderTheme stacked copies every frame
         clearChildren();
@@ -233,8 +235,7 @@ public class ThemesScreen extends StScreen {
         double mouseY = click.y();
         int button = click.button();
 
-
-if (button == 0) {
+        if (button == 0) {
 
             for (int i = 0; i < Theme.count(); i++) {
 
