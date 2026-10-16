@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ChatHudMixin",
+    "ChatHudResizeMixin",
     "ChatHudAccessor",
     "ChatScreenAccessor",
     "ScreenMixin",

@@ -18,6 +18,9 @@ public class StaffToolsConfig {
     public static final int MAX_POPUP_WIDTH = 512;
     public static final int MAX_POPUP_HEIGHT = 720;
 
+    /** How far the chat resize grip may push past the vanilla maximum. */
+    public static final double MAX_CHAT_BOOST = 6.0;
+
     private boolean chatMentionsEnabled = true;
     private boolean clickToCopyEnabled = true;
     private boolean playerActionsEnabled = true;
@@ -27,11 +30,24 @@ public class StaffToolsConfig {
     private boolean toastsEnabled = true;
 
     private boolean savePopupSize = true;
+
+    /** Keeps the resized chat size across game starts. */
+    private boolean saveChatSize = true;
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
     /** Animated frame around the panels (menus + popups). */
     private boolean menuAnimation = true;
+
+    /** Grip that resizes the vanilla chat while it is open. */
+    private boolean chatResizeEnabled = true;
+
+    /**
+     * Extra multipliers on top of the vanilla 320×180 maximum, used by
+     * the chat resize grip to make the chat larger than vanilla allows.
+     */
+    private double chatWidthBoost = 1.0;
+    private double chatHeightBoost = 1.0;
 
     // nick detection methods (see DetectionSettingsScreen)
     private boolean detectPlain = true;
@@ -102,12 +118,57 @@ public class StaffToolsConfig {
         this.savePopupSize = enabled;
     }
 
+    /** Persists the chat size that the resize grip produced. */
+    public boolean isSaveChatSize() {
+        return saveChatSize;
+    }
+
+    public void setSaveChatSize(boolean enabled) {
+        this.saveChatSize = enabled;
+    }
+
     public boolean isMenuAnimation() {
         return menuAnimation;
     }
 
     public void setMenuAnimation(boolean enabled) {
         this.menuAnimation = enabled;
+    }
+
+    /** Corner grip that resizes the vanilla chat (width / height / scale). */
+    public boolean isChatResizeEnabled() {
+        return chatResizeEnabled;
+    }
+
+    public void setChatResizeEnabled(boolean enabled) {
+        this.chatResizeEnabled = enabled;
+    }
+
+    /** Multiplier past the vanilla width maximum, 1 = untouched. */
+    public double getChatWidthBoost() {
+        return clampBoost(chatWidthBoost);
+    }
+
+    public void setChatWidthBoost(double boost) {
+        this.chatWidthBoost = clampBoost(boost);
+    }
+
+    /** Multiplier past the vanilla height maximum, 1 = untouched. */
+    public double getChatHeightBoost() {
+        return clampBoost(chatHeightBoost);
+    }
+
+    public void setChatHeightBoost(double boost) {
+        this.chatHeightBoost = clampBoost(boost);
+    }
+
+    private static double clampBoost(double boost) {
+
+        if (Double.isNaN(boost)) {
+            return 1.0;
+        }
+
+        return Math.clamp(boost, 1.0, MAX_CHAT_BOOST);
     }
 
     /** Width of the in-chat actions popup, in GUI pixels. */

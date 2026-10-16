@@ -98,8 +98,12 @@ public final class Lang {
         public static final String TOGGLE_CHAT_INPUT = "toggle.chatInput";
         public static final String TOGGLE_SAVE_POPUP_SIZE =
                 "toggle.savePopupSize";
+        public static final String TOGGLE_SAVE_CHAT_SIZE =
+                "toggle.saveChatSize";
         public static final String TOGGLE_MENU_ANIMATION =
                 "toggle.menuAnimation";
+        public static final String TOGGLE_CHAT_RESIZE =
+                "toggle.chatResize";
 
         // Detection methods (all shown in the detection settings)
         public static final String TOGGLE_DETECT_PLAIN =
@@ -389,7 +393,9 @@ public final class Lang {
         ru.put(Key.TOGGLE_TOASTS, "Уведомления");
         ru.put(Key.TOGGLE_CHAT_INPUT, "Ник из поля ввода");
         ru.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Сохранять размер попап действий");
+        ru.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Сохранять размер чата");
         ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
+        ru.put(Key.TOGGLE_CHAT_RESIZE, "Изменение размера чата");
 
         ru.put(Key.TOGGLE_DETECT_PLAIN, "Ник в тексте сообщения");
         ru.put(Key.TOGGLE_DETECT_DISPLAY, "Отображаемое имя (TAB)");
@@ -594,7 +600,9 @@ public final class Lang {
         en.put(Key.TOGGLE_TOASTS, "Notifications");
         en.put(Key.TOGGLE_CHAT_INPUT, "Chat-input nick");
         en.put(Key.TOGGLE_SAVE_POPUP_SIZE, "Save actions popup size");
+        en.put(Key.TOGGLE_SAVE_CHAT_SIZE, "Save chat size");
         en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
+        en.put(Key.TOGGLE_CHAT_RESIZE, "Chat resize handle");
 
         en.put(Key.TOGGLE_DETECT_PLAIN, "Nick in message text");
         en.put(Key.TOGGLE_DETECT_DISPLAY, "Tab-list display name");

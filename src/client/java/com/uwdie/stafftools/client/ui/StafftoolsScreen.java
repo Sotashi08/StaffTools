@@ -96,6 +96,13 @@ public class StafftoolsScreen extends StScreen {
                     StafftoolsClient.saveConfig();
                 });
 
+        addToggle(row++, Key.TOGGLE_SAVE_CHAT_SIZE,
+                config.isSaveChatSize(),
+                v -> {
+                    config.setSaveChatSize(v);
+                    StafftoolsClient.saveConfig();
+                });
+
         addToggle(row++, Key.TOGGLE_MENU_ANIMATION,
                 config.isMenuAnimation(),
                 v -> {

@@ -1,5 +1,6 @@
 package com.uwdie.stafftools.client.mixin;
 
+import com.uwdie.stafftools.client.ui.ChatResizer;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.ParentElement;
@@ -30,6 +31,22 @@ public interface ParentElementMixin {
             CallbackInfoReturnable<Boolean> cir
     ) {
 
+        // a chat resize drag outranks everything and has to survive
+        // even once the chat screen itself is gone
+        if (ChatResizer.INSTANCE.isResizing()) {
+
+            if (ChatResizer.INSTANCE.mouseDragged(
+                    click.x(),
+                    click.y(),
+                    click.button()
+            )) {
+
+                cir.setReturnValue(true);
+            }
+
+            return;
+        }
+
         if (!((Object) this instanceof ChatScreen)) {
             return;
         }
@@ -56,6 +73,20 @@ public interface ParentElementMixin {
             Click click,
             CallbackInfoReturnable<Boolean> cir
     ) {
+
+        if (ChatResizer.INSTANCE.isResizing()) {
+
+            if (ChatResizer.INSTANCE.mouseReleased(
+                    click.x(),
+                    click.y(),
+                    click.button()
+            )) {
+
+                cir.setReturnValue(true);
+            }
+
+            return;
+        }
 
         if (!((Object) this instanceof ChatScreen)) {
             return;

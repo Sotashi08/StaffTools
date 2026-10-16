@@ -129,6 +129,10 @@ public class DetectionSettingsScreen extends StScreen {
                 config::isChatInputDetectEnabled,
                 config::setChatInputDetectEnabled);
 
+        add(Key.TOGGLE_CHAT_RESIZE,
+                config::isChatResizeEnabled,
+                config::setChatResizeEnabled);
+
         int step = ROW_H + ROW_GAP;
 
         for (int i = 0; i < rows.size(); i++) {

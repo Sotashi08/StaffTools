@@ -8,6 +8,7 @@ import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
+import com.uwdie.stafftools.client.ui.ChatResizer;
 import com.uwdie.stafftools.client.ui.Toasts;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
@@ -55,6 +56,22 @@ public class ChatScreenMixin {
         );
 
         Toasts.INSTANCE.render(context);
+
+        // recorded last: the resize gizmo sits above everything else
+        ChatResizer.INSTANCE.render(context, mouseX, mouseY);
+    }
+
+    /**
+     * The screen can be left while the chat is being resized (ESC,
+     * another screen, a disconnect): end the drag and store the values.
+     */
+    @Inject(
+            method = "removed",
+            at = @At("HEAD")
+    )
+    private void stafftools$onRemoved(CallbackInfo ci) {
+
+        ChatResizer.INSTANCE.cancel();
     }
 
     /**
@@ -234,6 +251,19 @@ public class ChatScreenMixin {
             return;
         }
 
+        // the corner grip resizes the chat itself; it sits on top of the
+        // chat, so it has to win over the nick detection below
+        if (ChatResizer.INSTANCE.mouseClicked(
+                mouseX,
+                mouseY,
+                click.button(),
+                doubled
+        )) {
+
+            cir.setReturnValue(true);
+            return;
+        }
+
         // NEW: click on a nick inside a rendered chat line — works even
         // when the server did not attach any click event to it
         if (tryChatLineDetect(mouseX, mouseY)) {
@@ -253,6 +283,18 @@ public class ChatScreenMixin {
             double verticalAmount,
             CallbackInfoReturnable<Boolean> cir
     ) {
+
+        // the wheel over the resize grip zooms the chat instead of
+        // scrolling the message history
+        if (ChatResizer.INSTANCE.mouseScrolled(
+                mouseX,
+                mouseY,
+                verticalAmount
+        )) {
+
+            cir.setReturnValue(true);
+            return;
+        }
 
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 PlayerActionOverlay.INSTANCE.mouseScrolled(
