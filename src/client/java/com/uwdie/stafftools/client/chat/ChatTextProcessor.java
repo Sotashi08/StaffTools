@@ -522,11 +522,44 @@ public final class ChatTextProcessor {
                     )
             );
 
+            // A node can hold more than one nick. When the event only
+            // explains the whole node, the plain-text pass still runs on
+            // top, so a second player in the very same component is not
+            // swallowed by the first.
+            MutableText result = bare(node, mentioned);
+
+            if (content instanceof PlainTextContent plain) {
+
+                String string = plain.string();
+
+                if (string != null && !string.isEmpty()) {
+
+                    List<PlayerMention> others =
+                            PlayerMentionDetector.detect(string);
+
+                    if (!others.isEmpty()) {
+
+                        result = Text.literal("")
+                                .setStyle(mentioned);
+
+                        for (Text part :
+                                buildHighlighted(
+                                        string,
+                                        others,
+                                        mentioned
+                                )) {
+
+                            result.append(part);
+                        }
+                    }
+                }
+            }
+
             // the siblings keep the ORIGINAL inherited style on purpose:
             // the click must not bleed into the rest of the message, and
             // a child that inherits the same hover resolves on its own
             return withProcessedSiblings(
-                    bare(node, mentioned),
+                    result,
                     node,
                     style
             );

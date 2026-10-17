@@ -6,6 +6,7 @@ import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -40,78 +41,134 @@ public final class PlayerMentionDetector {
         StaffToolsConfig config =
                 StafftoolsClient.getConfig();
 
-        List<PlayerMention> mentions = findIn(message);
+        // Every layer is consulted, not just the first one that hits.
+        // A single line routinely mixes a real nick from the tab list
+        // with a /nick player known only through the tracker, and an
+        // early return used to hide the second one.
+        List<PlayerMention> all = new ArrayList<>();
 
-        if (!mentions.isEmpty()) {
-            return mentions;
-        }
+        // 1. real nicks from the tab list and the session cache
+        all.addAll(findIn(message));
 
-        // a player who changed their nick is only known by the new one
+        // 2. players known only under a nick they changed to
         if (config.isDetectAliases()) {
-
-            mentions = findRenamed(message);
-
-            if (!mentions.isEmpty()) {
-                return mentions;
-            }
+            all.addAll(findRenamed(message));
         }
 
+        // 3. the same two after folding look-alike unicode
         if (config.isDetectUnicode()) {
 
             String folded = TextNormalizer.unicodeFold(message);
 
             if (!folded.equals(message)) {
-
-                mentions = findIn(folded);
-
-                if (!mentions.isEmpty()) {
-                    return mentions;
-                }
-
-                mentions = findRenamed(folded);
-
-                if (!mentions.isEmpty()) {
-                    return mentions;
-                }
+                all.addAll(findIn(folded));
+                all.addAll(findRenamed(folded));
             }
         }
 
+        // 4. the same two after turning decorations into spaces
         if (config.isDetectDecor()) {
 
-            mentions = findIn(
-                    TextNormalizer.decorationFold(message)
-            );
+            String folded = TextNormalizer.decorationFold(message);
 
-            if (!mentions.isEmpty()) {
-                return mentions;
-            }
-
-            mentions = findRenamed(
-                    TextNormalizer.decorationFold(message)
-            );
-
-            if (!mentions.isEmpty()) {
-                return mentions;
+            if (!folded.equals(message)) {
+                all.addAll(findIn(folded));
+                all.addAll(findRenamed(folded));
             }
         }
 
-        mentions = detectStripped(message);
+        // 5. the same two with legacy colour codes removed
+        all.addAll(detectStripped(message));
+        all.addAll(detectStrippedRenamed(message));
 
-        if (!mentions.isEmpty()) {
-            return mentions;
+        List<PlayerMention> merged = merge(all);
+
+        if (!merged.isEmpty()) {
+            return merged;
         }
 
-        mentions = detectStrippedRenamed(message);
-
-        if (!mentions.isEmpty()) {
-            return mentions;
-        }
-
+        // 6. aliases learned from click / hover events, used as a
+        //    fallback: they are the loosest layer
         if (config.isDetectAliases()) {
             return NickAliases.detect(message);
         }
 
         return List.of();
+    }
+
+    /**
+     * Sorts the findings and removes the ones that collide.
+     *
+     * Layers overlap by nature — the tab list and the tracker can both
+     * claim the same range — and two layers can claim intersecting
+     * ranges, which would otherwise render as duplicated or garbled
+     * text. The longest range at the earliest position wins, so a real
+     * nick is never chopped by a shorter match inside it.
+     */
+    private static List<PlayerMention> merge(
+            List<PlayerMention> mentions
+    ) {
+
+        if (mentions.size() < 2) {
+            return mentions;
+        }
+
+        List<PlayerMention> sorted = new ArrayList<>(mentions);
+
+        // longest first so that, at the same position, the widest range
+        // is considered before the narrow ones
+        sorted.sort(
+                Comparator
+                        .comparingInt(PlayerMention::start)
+                        .thenComparing(
+                                (PlayerMention m) ->
+                                        m.end() - m.start(),
+                                Comparator.reverseOrder()
+                        )
+        );
+
+        List<PlayerMention> result = new ArrayList<>();
+
+        int cursor = 0;
+
+        for (PlayerMention mention : sorted) {
+
+            if (mention.start() < cursor ||
+                    mention.start() >= mention.end()) {
+
+                continue;
+            }
+
+            // the same range found twice by two layers: keep the one
+            // that may be repainted, so a /nick guess never hides a
+            // real nick
+            if (!result.isEmpty()) {
+
+                PlayerMention last =
+                        result.get(result.size() - 1);
+
+                if (last.start() == mention.start() &&
+                        last.end() == mention.end()) {
+
+                    if (mention.highlight() &&
+                            !last.highlight()) {
+
+                        result.set(
+                                result.size() - 1,
+                                mention
+                        );
+                    }
+
+                    continue;
+                }
+            }
+
+            result.add(mention);
+
+            cursor = mention.end();
+        }
+
+        return result;
     }
 
     /**
