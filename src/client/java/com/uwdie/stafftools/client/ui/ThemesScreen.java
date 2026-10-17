@@ -3,6 +3,7 @@ package com.uwdie.stafftools.client.ui;
 import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import com.uwdie.stafftools.client.ui.widget.StColorPicker;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
@@ -21,6 +22,11 @@ public class ThemesScreen extends StScreen {
     private int cardH = 52;
     private int contentTop;
     private int panelBottom;
+
+    /** Caption and swatch grid of the nick highlight picker. */
+    private int nickTop;
+    private int nickW;
+    private int nickX;
 
     public ThemesScreen() {
         super(Lang.text(Key.BTN_THEMES));
@@ -53,9 +59,32 @@ public class ThemesScreen extends StScreen {
 
         contentTop = 74;
 
-        panelBottom = contentTop
-                + rows * (cardH + GRID_GAP)
+        // the nick picker sits under the theme grid
+        nickW = Math.min(availW, 232);
+        nickX = (width - nickW) / 2;
+        nickTop = contentTop + rows * (cardH + GRID_GAP) + 10;
+
+        panelBottom = nickTop
+                + StColorPicker.heightOf(nickW)
                 + 44;
+
+        addDrawableChild(
+                new StColorPicker(
+                        nickX,
+                        nickTop,
+                        nickW,
+                        currentNick(),
+                        color -> {
+
+                            StafftoolsClient.getConfig()
+                                    .setNickHighlight(color);
+
+                            Ui.NICK_HIGHLIGHT = color;
+
+                            StafftoolsClient.saveConfig();
+                        }
+                )
+        );
 
         button(
                 width / 2 - 60,
@@ -65,6 +94,21 @@ public class ThemesScreen extends StScreen {
                 Key.BTN_BACK,
                 b -> client.setScreen(new StafftoolsScreen())
         );
+    }
+
+    /**
+     * The color currently in effect: the manual pick when there is one,
+     * otherwise the default the active theme ships with.
+     */
+    private static int currentNick() {
+
+        int manual =
+                StafftoolsClient.getConfig()
+                        .getNickHighlight();
+
+        return manual != 0
+                ? manual
+                : Theme.nickOf(Theme.getIndex());
     }
 
     private int cardX(int col) {
@@ -113,6 +157,56 @@ public class ThemesScreen extends StScreen {
                     alpha
             );
         }
+
+        drawNickCaption(context, mouseX, mouseY, alpha);
+    }
+
+    /** Caption above the nick swatches plus the reset link. */
+    private void drawNickCaption(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float alpha
+    ) {
+
+        context.drawTextWithShadow(
+                textRenderer,
+                Lang.text(Key.THEME_NICK_COLOR),
+                nickX,
+                nickTop - 12,
+                Ui.argb(Ui.TEXT_DIM, alpha)
+        );
+
+        boolean manual =
+                StafftoolsClient.getConfig()
+                        .isNickHighlightAuto()
+                        == false;
+
+        String reset =
+                manual
+                        ? Lang.t(Key.THEME_NICK_RESET)
+                        : Lang.t(Key.THEME_NICK_AUTO);
+
+        int w = textRenderer.getWidth(reset);
+
+        boolean over =
+                mouseX >= nickX + nickW - w &&
+                        mouseX <= nickX + nickW &&
+                        mouseY >= nickTop - 13 &&
+                        mouseY <= nickTop - 4;
+
+        context.drawTextWithShadow(
+                textRenderer,
+                Text.literal(reset),
+                nickX + nickW - w,
+                nickTop - 12,
+                Ui.argb(
+                        manual
+                                ? over ? Ui.DANGER : Ui.TEXT_MUTED
+                                : Ui.TEXT_MUTED,
+                        alpha
+                )
+        );
     }
 
     private void drawThemeCard(
@@ -236,6 +330,27 @@ public class ThemesScreen extends StScreen {
         int button = click.button();
 
         if (button == 0) {
+
+            // the "back to theme default" link
+            if (StafftoolsClient.getConfig()
+                    .isNickHighlightAuto() == false &&
+                    mouseY >= nickTop - 13 &&
+                    mouseY <= nickTop - 4 &&
+                    mouseX >= nickX &&
+                    mouseX <= nickX + nickW) {
+
+                StafftoolsClient.getConfig()
+                        .setNickHighlight(0);
+
+                Ui.NICK_HIGHLIGHT =
+                        Theme.nickOf(Theme.getIndex());
+
+                StafftoolsClient.saveConfig();
+
+                client.setScreen(new ThemesScreen());
+
+                return true;
+            }
 
             for (int i = 0; i < Theme.count(); i++) {
 

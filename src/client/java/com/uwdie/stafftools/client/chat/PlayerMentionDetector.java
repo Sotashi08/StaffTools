@@ -20,7 +20,9 @@ import java.util.List;
  *    ("[VIP]Notch\u2605" -> " VIP Notch "),
  * 5. the same two after stripping legacy colour codes
  *    ("\u00A7aPl\u00A7fayer" -> "Player"),
- * 6. aliases learned from click / hover events.
+ * 6. aliases learned from click / hover events,
+ * 7. nicks learned from a /nick change (EssentialsX), where the tab list
+ *    shows the new name while the real one is nowhere in the text.
  */
 public final class PlayerMentionDetector {
 
@@ -44,6 +46,16 @@ public final class PlayerMentionDetector {
             return mentions;
         }
 
+        // a player who changed their nick is only known by the new one
+        if (config.isDetectAliases()) {
+
+            mentions = findRenamed(message);
+
+            if (!mentions.isEmpty()) {
+                return mentions;
+            }
+        }
+
         if (config.isDetectUnicode()) {
 
             String folded = TextNormalizer.unicodeFold(message);
@@ -51,6 +63,12 @@ public final class PlayerMentionDetector {
             if (!folded.equals(message)) {
 
                 mentions = findIn(folded);
+
+                if (!mentions.isEmpty()) {
+                    return mentions;
+                }
+
+                mentions = findRenamed(folded);
 
                 if (!mentions.isEmpty()) {
                     return mentions;
@@ -67,9 +85,23 @@ public final class PlayerMentionDetector {
             if (!mentions.isEmpty()) {
                 return mentions;
             }
+
+            mentions = findRenamed(
+                    TextNormalizer.decorationFold(message)
+            );
+
+            if (!mentions.isEmpty()) {
+                return mentions;
+            }
         }
 
         mentions = detectStripped(message);
+
+        if (!mentions.isEmpty()) {
+            return mentions;
+        }
+
+        mentions = detectStrippedRenamed(message);
 
         if (!mentions.isEmpty()) {
             return mentions;
@@ -80,6 +112,83 @@ public final class PlayerMentionDetector {
         }
 
         return List.of();
+    }
+
+    /**
+ * Mentions of players known only under a nick they changed to.
+ *
+ * These are NOT highlighted: the word belongs to somebody's sentence and
+ * repainting it would turn unrelated chat words yellow.
+ */
+    private static List<PlayerMention> findRenamed(
+            String message
+    ) {
+
+        List<PlayerMention> mentions = new ArrayList<>();
+
+        String lower = message.toLowerCase();
+
+        for (PlayerContext player :
+                EssentialsNickTracker.get().findIn(message)) {
+
+            String nick =
+                    nickOf(player, message);
+
+            if (nick == null) {
+                continue;
+            }
+
+            int index = lower.indexOf(nick);
+
+            while (index >= 0) {
+
+                int end = index + nick.length();
+
+                boolean left =
+                        index == 0 ||
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(index - 1));
+
+                boolean right =
+                        end >= lower.length() ||
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(end));
+
+                if (left && right) {
+
+                    mentions.add(
+                            new PlayerMention(
+                                    player,
+                                    index,
+                                    end,
+                                    false
+                            )
+                    );
+                }
+
+                index = lower.indexOf(nick, index + 1);
+            }
+        }
+
+        return mentions;
+    }
+
+    /** The changed nick of a player as it appears in the text. */
+    private static String nickOf(
+            PlayerContext player,
+            String message
+    ) {
+
+        for (String nick :
+                EssentialsNickTracker.get()
+                        .nicksOf(player)) {
+
+            if (message.toLowerCase().contains(nick)) {
+                return nick;
+            }
+        }
+
+        return null;
     }
 
     /** Tab list + local cache matching on the given string. */
@@ -167,61 +276,102 @@ public final class PlayerMentionDetector {
         return mentions;
     }
 
-    /**
-     * Strips legacy formatting codes ("§x") from the message while
-     * keeping the indices stable, then runs the normal detection on the
-     * clean text and converts the resulting ranges back.
-     */
-    private static List<PlayerMention> detectStripped(
-            String message
-    ) {
+/**
+ * Strips legacy formatting codes ("§x") from the message while
+ * keeping the indices stable, then runs the given detection on the
+ * clean text and converts the resulting ranges back.
+ */
+private static List<PlayerMention> detectStripped(
+        String message
+) {
 
-        StringBuilder clean = new StringBuilder();
+    int[] map = new int[message.length()];
 
-        int[] map = new int[message.length()];
-        int size = 0;
+    StringBuilder clean = new StringBuilder();
 
-        for (int i = 0; i < message.length(); i++) {
+    int size = 0;
 
-            char c = message.charAt(i);
+    for (int i = 0; i < message.length(); i++) {
 
-            if (c == '\u00A7' &&
-                    i + 1 < message.length()) {
+        char c = message.charAt(i);
 
-                i++;
-                continue;
-            }
+        if (c == '\u00A7' &&
+                i + 1 < message.length()) {
 
-            map[size++] = i;
-            clean.append(c);
+            i++;
+            continue;
         }
 
-        if (size == message.length()) {
-            return List.of();
-        }
-
-        String cleaned = clean.toString();
-
-        List<PlayerMention> stripped =
-                findIn(cleaned);
-
-        if (stripped.isEmpty()) {
-            return List.of();
-        }
-
-        List<PlayerMention> result = new ArrayList<>();
-
-        for (PlayerMention m : stripped) {
-
-            result.add(
-                    new PlayerMention(
-                            m.player(),
-                            map[m.start()],
-                            map[m.end() - 1] + 1
-                    )
-            );
-        }
-
-        return result;
+        map[size++] = i;
+        clean.append(c);
     }
+
+    if (size == message.length()) {
+        return List.of();
+    }
+
+    return remap(findIn(clean.toString()), map);
+}
+
+/** Same, but over the players known only under a changed nick. */
+private static List<PlayerMention> detectStrippedRenamed(
+        String message
+) {
+
+    int[] map = new int[message.length()];
+
+    StringBuilder clean = new StringBuilder();
+
+    int size = 0;
+
+    for (int i = 0; i < message.length(); i++) {
+
+        char c = message.charAt(i);
+
+        if (c == '\u00A7' &&
+                i + 1 < message.length()) {
+
+            i++;
+            continue;
+        }
+
+        map[size++] = i;
+        clean.append(c);
+    }
+
+    if (size == message.length()) {
+        return List.of();
+    }
+
+    return remap(
+            findRenamed(clean.toString()),
+            map
+    );
+}
+
+/** Converts ranges found in the cleaned text back to the original. */
+private static List<PlayerMention> remap(
+        List<PlayerMention> stripped,
+        int[] map
+) {
+
+    if (stripped.isEmpty()) {
+        return List.of();
+    }
+
+    List<PlayerMention> result = new ArrayList<>();
+
+    for (PlayerMention m : stripped) {
+
+        result.add(
+                new PlayerMention(
+                        m.player(),
+                        map[m.start()],
+                        map[m.end() - 1] + 1
+                )
+        );
+    }
+
+    return result;
+}
 }

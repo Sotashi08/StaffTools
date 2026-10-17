@@ -23,7 +23,12 @@ public class ChatHudMixin {
     )
     private Text stafftools$styleMessage(Text message) {
 
-        return ChatTextProcessor.process(message);
+        Text processed = ChatTextProcessor.process(message);
+
+        // a chat plugin may deliver the whole line as one component, in
+        // which case the per-node pass finds nothing and the whole-line
+        // pass has to take over
+        return ChatTextProcessor.processWholeMessage(processed);
     }
 
     @Inject(

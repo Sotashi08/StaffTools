@@ -31,6 +31,13 @@ public final class Ui {
     public static int PANEL_BG = 0xF0141418;
     public static int PANEL_BG_SOFT = 0x22000000;
 
+    /**
+     * Color of a detected nick in chat. Kept out of the theme palette on
+     * purpose: it is the one color a moderator tunes by hand, so it is
+     * stored in the config and only seeded from the theme on first use.
+     */
+    public static int NICK_HIGHLIGHT = 0xFFFFD24A;
+
     private Ui() {
     }
 

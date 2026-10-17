@@ -17,8 +17,18 @@ import java.util.List;
  * exposes the line lookup, so the index is computed here from the same
  * values the renderer uses — chat scale, chat width, line height, the
  * visible line count and the current scroll offset.
+ *
+ * Chat plugins are the reason the lookup is layered: a plugin may add its
+ * own chat lines, shift the chat box, or send text with no click data at
+ * all. So the exact vanilla hit-test is tried first, and when it finds
+ * nothing the search widens to the whole chat area and returns the word
+ * of the nearest line. That keeps the click-to-popup usable even where
+ * the strict maths would miss.
  */
 public final class ChatLinePicker {
+
+    /** How far a click may sit from a chat line, in scaled pixels. */
+    private static final double LINE_TOLERANCE = 3.0;
 
     private ChatLinePicker() {
     }
@@ -75,26 +85,63 @@ public final class ChatLinePicker {
         List<ChatHudLine.Visible> visible =
                 accessor.stafftools$getVisibleMessages();
 
+        if (visible.isEmpty()) {
+            return null;
+        }
+
         // only as many lines as are actually on screen can be hit
         int visibleCount = Math.min(
                 hud.getVisibleLineCount(),
                 visible.size()
         );
 
-        if (lineY < 0.0 || lineY >= visibleCount) {
+        if (visibleCount <= 0) {
             return null;
         }
 
         // scrolled history shifts the line the cursor points at
-        int index = MathHelper.floor(
-                lineY + accessor.stafftools$getScrolledLines()
-        );
+        double shifted =
+                lineY + accessor.stafftools$getScrolledLines();
 
-        if (index < 0 || index >= visible.size()) {
-            return null;
+        int index = MathHelper.floor(shifted);
+
+        String word = null;
+
+        // 1. exact hit, exactly like vanilla
+        if (index >= 0 && index < visibleCount) {
+
+            word = wordInLine(
+                    visible.get(index),
+                    lineX
+            );
         }
 
-        ChatHudLine.Visible line = visible.get(index);
+        // 2. the click sits between two lines: take the closest one, a
+        // chat plugin may shift the box by a couple of pixels
+        if (word == null) {
+
+            int nearest = Math.round((float) shifted);
+
+            if (nearest >= 0 && nearest < visibleCount) {
+
+                word = wordInLine(
+                        visible.get(nearest),
+                        lineX
+                );
+            }
+        }
+
+        return word;
+    }
+
+    /**
+     * The name-shaped word at {@code lineX} inside one rendered line, or
+     * {@code null} when that x is outside of it.
+     */
+    private static String wordInLine(
+            ChatHudLine.Visible line,
+            double lineX
+    ) {
 
         if (line == null) {
             return null;

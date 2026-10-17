@@ -22,6 +22,9 @@ public class StafftoolsClient implements ClientModInitializer {
 
     private static KeyBinding openStaffToolsKey;
 
+    /** Guards the one-shot cache wipe on disconnect. */
+    private static boolean sessionEnded;
+
     @Override
     public void onInitializeClient() {
 
@@ -62,6 +65,24 @@ public class StafftoolsClient implements ClientModInitializer {
         );
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+
+            // the tab list is about to be wiped: whatever was learned
+            // about it must not survive into the next server
+            if (client.getNetworkHandler() == null &&
+                    !sessionEnded) {
+
+                sessionEnded = true;
+
+                com.uwdie.stafftools.client.chat
+                        .NickCache.get().clear();
+
+                com.uwdie.stafftools.client.chat
+                        .EssentialsNickTracker.get().clear();
+
+            } else if (client.getNetworkHandler() != null) {
+
+                sessionEnded = false;
+            }
 
             while (openStaffToolsKey.wasPressed()) {
 

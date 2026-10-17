@@ -21,7 +21,8 @@ public final class Theme {
             int text,
             int textDim,
             int textMuted,
-            int panelBg
+            int panelBg,
+            int nick
     ) {
     }
 
@@ -30,43 +31,43 @@ public final class Theme {
                     "theme.ocean",
                     0xFF3F8AE0, 0, 0xFF7DBCFF, 0xFF2A5D9E, 0xFF2E5E9E,
                     0xFFFFFFFF, 0xFFAAAAAA, 0xFF777777,
-                    0xF0141418
+                    0xF0141418, 0xFF7DBCFF
             ),
             new Palette(
                     "theme.emerald",
                     0xFF2FCC8F, 0, 0xFF6FE7B8, 0xFF1D8A61, 0xFF1F7A57,
                     0xFFFFFFFF, 0xFFA9C5B8, 0xFF6F8579,
-                    0xF0101714
+                    0xF0101714, 0xFF6FE7B8
             ),
             new Palette(
                     "theme.amethyst",
                     0xFF9B6FE3, 0xFFE36FC4, 0xFFC3A3FF, 0xFF6B44B8, 0xFF6C4FB3,
                     0xFFFFFFFF, 0xFFBCB0CE, 0xFF7C7290,
-                    0xF0161219
+                    0xF0161219, 0xFFE36FC4
             ),
             new Palette(
                     "theme.crimson",
                     0xFFCB4848, 0, 0xFFE89B9B, 0xFF8F3232, 0xFF8F3A3A,
                     0xFFFFFFFF, 0xFFC9AEAE, 0xFF856969,
-                    0xF0191010
+                    0xF0191010, 0xFFFF7A7A
             ),
             new Palette(
                     "theme.dawn",
                     0xFFD9A94E, 0xFFF2D49B, 0xFFF0D49A, 0xFF9C742F, 0xFF9C7434,
                     0xFFFFFFFF, 0xFFD8CBA8, 0xFF8A7E64,
-                    0xF01A1710
+                    0xF01A1710, 0xFFFFE08A
             ),
             new Palette(
                     "theme.aurora",
                     0xFF35D0BA, 0xFF4FA8FF, 0xFF8FE8DB, 0xFF1F8F80, 0xFF1F7A93,
                     0xFFFFFFFF, 0xFFAAC9CF, 0xFF68858B,
-                    0xF00E1717
+                    0xF00E1717, 0xFF8FE8DB
             ),
             new Palette(
                     "theme.neon",
                     0xFFFF3D8F, 0xFF38C6FF, 0xFFFFA1CC, 0xFFB21D63, 0xFF2E7FB8,
                     0xFFFFFFFF, 0xFFC0B7CE, 0xFF7E7595,
-                    0xF0121018
+                    0xF0121018, 0xFF38C6FF
             )
     };
 
@@ -100,6 +101,24 @@ public final class Theme {
 
         Ui.PANEL_BG = p.panelBg();
         Ui.PANEL_BG_SOFT = 0x22000000;
+
+        // a manual pick wins over the theme default
+        int nick =
+                com.uwdie.stafftools.client.StafftoolsClient
+                        .getConfig()
+                        .getNickHighlight();
+
+        Ui.NICK_HIGHLIGHT = nick != 0
+                ? nick
+                : p.nick();
+    }
+
+    /** Nick highlight a preset ships with. */
+    public static int nickOf(int themeIndex) {
+
+        int i = Math.clamp(themeIndex, 0, PRESETS.length - 1);
+
+        return PRESETS[i].nick();
     }
 
     public static int getIndex() {

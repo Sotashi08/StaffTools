@@ -75,6 +75,9 @@ public class StaffToolsConfig {
 
     private int themeIndex = 0;
 
+    /** Nick highlight in chat; 0 = follow the theme. */
+    private int nickHighlight = 0;
+
     private boolean chatInputDetectEnabled = true;
 
     private Lang.Language language = Lang.Language.RU;
@@ -338,6 +341,23 @@ public class StaffToolsConfig {
 
     public void setThemeIndex(int index) {
         this.themeIndex = Math.max(0, index);
+    }
+
+    /**
+     * Color a detected nick is painted with in chat. 0 means "follow the
+     * theme", which keeps the default look of every existing preset.
+     */
+    public int getNickHighlight() {
+        return nickHighlight;
+    }
+
+    public void setNickHighlight(int color) {
+        this.nickHighlight = color & 0xFFFFFFFF;
+    }
+
+    /** True while the nick color still follows the theme. */
+    public boolean isNickHighlightAuto() {
+        return nickHighlight == 0;
     }
 
     public boolean isChatInputDetectEnabled() {

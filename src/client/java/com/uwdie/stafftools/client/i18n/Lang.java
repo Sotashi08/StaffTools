@@ -61,6 +61,12 @@ public final class Lang {
         public static final String BTN_DETECTION = "btn.detection";
         public static final String BTN_PROFILES = "btn.profiles";
         public static final String BTN_SETTINGS = "btn.settings";
+        public static final String THEME_NICK_COLOR =
+                "theme.nickColor";
+        public static final String THEME_NICK_RESET =
+                "theme.nickReset";
+        public static final String THEME_NICK_AUTO =
+                "theme.nickAuto";
 
         // Titles / hints
         public static final String TITLE_DETECTION = "title.detection";
@@ -433,6 +439,9 @@ public final class Lang {
         ru.put(Key.TOGGLE_MOD_HUD, "HUD модератора в чате");
         ru.put(Key.TOGGLE_MOD_HUD_PHRASES, "Фразы в HUD модератора");
         ru.put(Key.BTN_SETTINGS, "Настройки");
+        ru.put(Key.THEME_NICK_COLOR, "Подсветка ника в чате");
+        ru.put(Key.THEME_NICK_RESET, "сбросить");
+        ru.put(Key.THEME_NICK_AUTO, "цвет темы");
         ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
         ru.put(Key.TOGGLE_CHAT_RESIZE, "Изменение размера чата");
 
@@ -663,6 +672,9 @@ public final class Lang {
         en.put(Key.TOGGLE_MOD_HUD, "Moderator HUD in chat");
         en.put(Key.TOGGLE_MOD_HUD_PHRASES, "Phrases in the moderator HUD");
         en.put(Key.BTN_SETTINGS, "Settings");
+        en.put(Key.THEME_NICK_COLOR, "Nick highlight in chat");
+        en.put(Key.THEME_NICK_RESET, "reset");
+        en.put(Key.THEME_NICK_AUTO, "theme color");
         en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
         en.put(Key.TOGGLE_CHAT_RESIZE, "Chat resize handle");
 
