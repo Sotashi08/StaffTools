@@ -23,12 +23,27 @@ public class ChatHudMixin {
     )
     private Text stafftools$styleMessage(Text message) {
 
+        if (message == null) {
+            return null;
+        }
+
+        String original = message.getString();
+
         Text processed = ChatTextProcessor.process(message);
 
         // a chat plugin may deliver the whole line as one component, in
         // which case the per-node pass finds nothing and the whole-line
         // pass has to take over
-        return ChatTextProcessor.processWholeMessage(processed);
+        Text result = ChatTextProcessor.processWholeMessage(processed);
+
+        // never let the mod cut chat text: if the whole-line rebuild
+        // shrank the string, fall back to the per-node result (which
+        // keeps every character but may lack whole-line highlighting)
+        if (result == null || result.getString().length() < original.length()) {
+            return processed;
+        }
+
+        return result;
     }
 
     @Inject(

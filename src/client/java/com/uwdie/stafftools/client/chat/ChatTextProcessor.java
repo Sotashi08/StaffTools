@@ -144,6 +144,13 @@ public final class ChatTextProcessor {
             );
         }
 
+        // never return a rebuilt message that is shorter than the source:
+        // a shrunken string means text was lost during the rebuild, so
+        // hand back the original untouched
+        if (result.getString().length() < message.getString().length()) {
+            return message;
+        }
+
         return result;
     }
 
