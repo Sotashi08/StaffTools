@@ -80,6 +80,9 @@ public class StaffToolsConfig {
 
     private boolean chatInputDetectEnabled = true;
 
+    /** Copy the whole chat line under the cursor with Alt + click. */
+    private boolean chatCopyEnabled = true;
+
     private Lang.Language language = Lang.Language.RU;
 
     private List<Macro> macros = new ArrayList<>();
@@ -366,6 +369,14 @@ public class StaffToolsConfig {
 
     public void setChatInputDetectEnabled(boolean enabled) {
         this.chatInputDetectEnabled = enabled;
+    }
+
+    public boolean isChatCopyEnabled() {
+        return chatCopyEnabled;
+    }
+
+    public void setChatCopyEnabled(boolean enabled) {
+        this.chatCopyEnabled = enabled;
     }
 
     public Lang.Language getLanguage() {

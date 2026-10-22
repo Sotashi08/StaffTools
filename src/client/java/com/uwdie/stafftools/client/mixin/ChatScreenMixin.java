@@ -242,6 +242,27 @@ public class ChatScreenMixin {
         double mouseX = click.x();
         double mouseY = click.y();
 
+        // Alt + click on a chat line copies its full text to the clipboard
+        if (click.button() == 0 &&
+                StafftoolsClient.getConfig().isChatCopyEnabled() &&
+                isAltPressed()) {
+
+            String line = ChatLinePicker.lineTextAt(mouseX, mouseY);
+
+            if (line != null && !line.isBlank()) {
+
+                MinecraftClient client = MinecraftClient.getInstance();
+                client.keyboard.setClipboard(line);
+
+                Toasts.INSTANCE.success(
+                        Lang.t(Lang.Key.TOAST_COPIED)
+                );
+
+                cir.setReturnValue(true);
+                return;
+            }
+        }
+
         // the moderator panel is draggable and floats above the chat
         if (ModeratorHud.INSTANCE.mouseClicked(mouseX, mouseY)) {
             cir.setReturnValue(true);
@@ -519,5 +540,15 @@ public class ChatScreenMixin {
     private static boolean isNameChar(char c) {
         return Character.isLetterOrDigit(c)
                 || c == '_';
+    }
+
+    /** Left or right Alt held down. */
+    private static boolean isAltPressed() {
+
+        long window = MinecraftClient.getInstance().getWindow()
+                .getHandle();
+
+        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_ALT) == GLFW.GLFW_PRESS ||
+                GLFW.glfwGetKey(window, GLFW.GLFW_KEY_RIGHT_ALT) == GLFW.GLFW_PRESS;
     }
 }

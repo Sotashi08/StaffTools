@@ -199,4 +199,94 @@ public final class ChatLinePicker {
 
         return builder.toString();
     }
+
+    /**
+     * The full text of the chat line under the cursor, or {@code null}
+     * when the cursor is not on a chat line. Used for Alt+click copy.
+     */
+    public static String lineTextAt(double mouseX, double mouseY) {
+
+        ChatHudLine.Visible line = pickLine(mouseX, mouseY);
+
+        if (line == null) {
+            return null;
+        }
+
+        String text = textOf(line.content());
+
+        return text.isEmpty() ? null : text;
+    }
+
+    /** The chat line the cursor currently points at, or null. */
+    private static ChatHudLine.Visible pickLine(double mouseX, double mouseY) {
+
+        MinecraftClient client =
+                MinecraftClient.getInstance();
+
+        if (client.inGameHud == null) {
+            return null;
+        }
+
+        ChatHud hud = client.inGameHud.getChatHud();
+
+        if (hud == null) {
+            return null;
+        }
+
+        ChatHudAccessor accessor = (ChatHudAccessor) hud;
+
+        double chatScale = accessor.stafftools$getChatScale();
+
+        double lineX = mouseX / chatScale - 4.0;
+
+        double lineY =
+                (client.getWindow().getScaledHeight()
+                        - mouseY - 40.0)
+                        / (chatScale
+                        * accessor.stafftools$getLineHeight());
+
+        double maxX =
+                MathHelper.floor(
+                        accessor.stafftools$getWidth()
+                                / chatScale
+                );
+
+        if (lineX < -4.0 || lineX > maxX) {
+            return null;
+        }
+
+        List<ChatHudLine.Visible> visible =
+                accessor.stafftools$getVisibleMessages();
+
+        if (visible.isEmpty()) {
+            return null;
+        }
+
+        int visibleCount = Math.min(
+                hud.getVisibleLineCount(),
+                visible.size()
+        );
+
+        if (visibleCount <= 0) {
+            return null;
+        }
+
+        double shifted = lineY + accessor.stafftools$getScrolledLines();
+
+        int index = MathHelper.floor(shifted);
+
+        if (index >= 0 && index < visibleCount) {
+
+            return visible.get(index);
+        }
+
+        int nearest = Math.round((float) shifted);
+
+        if (nearest >= 0 && nearest < visibleCount) {
+
+            return visible.get(nearest);
+        }
+
+        return null;
+    }
 }
