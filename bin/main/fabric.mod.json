@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "stafftools",
+  "version": "${version}",
+  "name": "StaffTools",
+  "description": "Client-side moderation toolkit: clickable player names in chat, an action popup (ban/mute/kick in two clicks), custom macros with placeholders, punishment history and toast notifications.",
+  "authors": [
+    "uwdie"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/stafftools/icon.png",
+
+  "environment": "client",
+
+  "entrypoints": {
+    "client": [
+      "com.uwdie.stafftools.client.StafftoolsClient"
+    ],
+    "main": [
+      "com.uwdie.stafftools.Stafftools"
+    ]
+  },
+
+  "mixins": [
+    "stafftools.mixins.json",
+    {
+      "config": "stafftools.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

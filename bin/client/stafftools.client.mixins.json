@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "package": "com.uwdie.stafftools.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "ChatHudMixin",
+    "ChatHudResizeMixin",
+    "ChatHudAccessor",
+    "ChatScreenAccessor",
+    "ScreenMixin",
+    "ChatScreenMixin",
+    "ParentElementMixin",
+    "ClientPlayNetworkHandlerMixin",
+    "InGameHudMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
