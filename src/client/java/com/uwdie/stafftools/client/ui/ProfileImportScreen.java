@@ -22,7 +22,7 @@ public class ProfileImportScreen extends StScreen {
 
     private static final int ROW_H = 24;
     private static final int ROW_GAP = 3;
-    private static final int LIST_TOP = 46;
+    private int LIST_TOP;
     private static final int FADE_H = 12;
 
     private static final float SCROLL_STIFF = 240f;
@@ -71,7 +71,9 @@ public class ProfileImportScreen extends StScreen {
         rowWidth = Math.min(280, formWidth());
         rowLeft = (width - rowWidth) / 2;
 
-        listBottom = height - 66;
+        listBottom = contentBottom() - 66;
+
+        LIST_TOP = contentTop() + 34;
 
         scroll = Math.min(scroll, maxScroll());
         scrollPos = scroll;
@@ -103,7 +105,7 @@ public class ProfileImportScreen extends StScreen {
 
         button(
                 rowLeft,
-                height - 32,
+                contentBottom() - 26,
                 half,
                 22,
                 Key.BTN_PROFILE_OPEN_FOLDER,
@@ -112,7 +114,7 @@ public class ProfileImportScreen extends StScreen {
 
         button(
                 rowLeft + half + 8,
-                height - 32,
+                contentBottom() - 26,
                 half,
                 22,
                 Key.BTN_REFRESH,
@@ -121,11 +123,11 @@ public class ProfileImportScreen extends StScreen {
 
         button(
                 rowLeft,
-                height - 58,
+                contentBottom() - 52,
                 rowWidth,
                 20,
                 Key.BTN_BACK,
-                b -> client.setScreen(new ProfilesScreen(parent))
+                b -> client.setScreen(new StafftoolsScreen())
         );
     }
 
@@ -199,8 +201,16 @@ public class ProfileImportScreen extends StScreen {
 
     private void updateScroll(float delta) {
 
-        float step = Ui.clamp01(delta) * 0.05f;
         float max = maxScroll();
+        if (!Ui.animationsEnabled()) {
+            scroll = Math.clamp(scroll, 0f, max);
+            scrollPos = scroll;
+            scrollVel = 0f;
+            return;
+        }
+
+        float step = Ui.clamp01(delta) * 0.05f
+                * Ui.animationSpeed();
 
         float target = Math.clamp(
                 scroll,
@@ -267,7 +277,16 @@ public class ProfileImportScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.TITLE_PROFILE_IMPORT, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDCC1",
+                Lang.t(Key.TITLE_PROFILE_IMPORT),
+                Lang.t(Key.MSG_PROFILE_IMPORT_HINT),
+                alpha
+        );
 
         drawHint(context, Key.MSG_PROFILE_IMPORT_HINT, 30, alpha);
 
@@ -314,8 +333,6 @@ public class ProfileImportScreen extends StScreen {
                 listBottom
         );
 
-        long now = System.currentTimeMillis();
-
         int step = ROW_H + ROW_GAP;
 
         for (int i = 0; i < fileCount; i++) {
@@ -326,8 +343,10 @@ public class ProfileImportScreen extends StScreen {
                 continue;
             }
 
-            float rowAlpha = Ui.clamp01(
-                    (now - openTime - i * 20L) / 170f
+            float rowAlpha = Ui.entranceProgress(
+                    openTime,
+                    i * 14L,
+                    210L
             );
 
             if (rowAlpha <= 0.01f) {
@@ -339,7 +358,10 @@ public class ProfileImportScreen extends StScreen {
                     y,
                     rowLeft + rowWidth - 9,
                     y + ROW_H,
-                    Ui.argb(Ui.PANEL_BG_SOFT, alpha * rowAlpha * 0.8f)
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.04f),
+                            alpha * rowAlpha
+                    )
             );
         }
 
@@ -353,34 +375,20 @@ public class ProfileImportScreen extends StScreen {
             float alpha
     ) {
 
+        int max = maxScroll();
+
         float top = Ui.clamp01(scrollPos / FADE_H);
+        float bottom = Ui.clamp01((max - scrollPos) / FADE_H);
 
-        float bottom = Ui.clamp01(
-                (maxScroll() - scrollPos) / FADE_H
+        Ui.drawScrollFade(
+                context,
+                rowLeft + 9,
+                LIST_TOP,
+                rowWidth - 18,
+                listBottom,
+                top,
+                bottom,
+                alpha
         );
-
-        if (top > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + 9,
-                    LIST_TOP,
-                    rowLeft + rowWidth - 9,
-                    LIST_TOP + FADE_H,
-                    Ui.argb(Ui.PANEL_BG, alpha * top),
-                    Ui.argb(Ui.PANEL_BG, 0f)
-            );
-        }
-
-        if (bottom > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + 9,
-                    listBottom - FADE_H,
-                    rowLeft + rowWidth - 9,
-                    listBottom,
-                    Ui.argb(Ui.PANEL_BG, 0f),
-                    Ui.argb(Ui.PANEL_BG, alpha * bottom)
-            );
-        }
     }
 }

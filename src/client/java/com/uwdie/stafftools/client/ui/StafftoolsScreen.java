@@ -1,38 +1,65 @@
 package com.uwdie.stafftools.client.ui;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
+import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
-import com.uwdie.stafftools.client.ui.widget.StButton;
+import com.uwdie.stafftools.client.punishment.PunishmentHistory;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Main menu: a single centered column — animated text logo on top,
- * navigation buttons, then settings toggles, all inside one panel.
+ * Main screen, laid out like the reference launcher UI:
+ *
+ * <pre>
+ *   [rail] | top bar: title, status pill, profile, window controls
+ *          | tabs: General / Interface / Chat / System
+ *          | content: section title + description, dropdown,
+ *          |          colour swatches, two-column toggle rows
+ * </pre>
+ *
+ * <p>The General tab is the dashboard: language, accent colour and the
+ * most-used switches. The other tabs group the remaining settings and
+ * the navigation entries, so nothing is more than one click away.
  */
 public class StafftoolsScreen extends StScreen {
 
-    private static final String LOGO_TEXT = "StaffTools";
+    private static final int TAB_GENERAL = 0;
+    private static final int TAB_INTERFACE = 1;
+    private static final int TAB_CHAT = 2;
+    private static final int TAB_SYSTEM = 3;
 
-    private static final int COL_W = 220;
-    private static final int WIDGET_H = 20;
-    private static final int ROW_STEP = 22;
+    private static final int ROW_H = 30;
+    private static final int ROW_GAP = 8;
+    private static final int GENERAL_ROW_GAP = 4;
+    private static final int GENERAL_LANGUAGE_TITLE_GAP = 30;
+    private static final int GENERAL_LANGUAGE_HEIGHT = 26;
+    private static final int GENERAL_LANGUAGE_GAP = 38;
+    private static final int GENERAL_ACCENT_TITLE_GAP = 30;
+    private static final int GENERAL_SWITCH_GAP = 14;
+    private static final int GENERAL_SWITCH_ROWS = 3;
+    private static final int SWATCH = 30;
+    private static final int SWATCH_GAP = 8;
 
-    private static final int LOGO_Y = 54;
-    private static final int TAGLINE_Y = 74;
+    private int tab = TAB_GENERAL;
 
-    private int colX;
-    private int contentTop;
-    private int panelBottom;
+    /** Hit boxes of the interactive content, rebuilt every frame. */
+    private final List<Object[]> hits = new ArrayList<>();
 
-    /** One random slogan per screen instance. */
-    private final String tagline = Lang.tagline();
+    /** Language dropdown state. */
+    private boolean langOpen;
+    private float frameDelta;
+    private int generalScroll;
 
-    private final int logoVariant =
-            java.util.concurrent.ThreadLocalRandom
-                    .current()
-                    .nextInt(4);
+    /** Animated knob positions, keyed by setting id. */
+    private final java.util.Map<String, Float> knobs =
+            new java.util.HashMap<>();
+    private final java.util.Map<String, Float> hoverAmounts =
+            new java.util.HashMap<>();
 
     public StafftoolsScreen() {
         super(Lang.text(Key.APP_TITLE));
@@ -43,97 +70,55 @@ public class StafftoolsScreen extends StScreen {
 
         resetSlots();
 
-        colX = (width - COL_W) / 2;
+        clearChildren();
 
-        contentTop = 96;
+        configureShell();
 
-        int row = 0;
-
-        addNavButton(row++, "⚙ ", Key.BTN_MACROS, () ->
-                client.setScreen(new MacroListScreen(this)));
-
-        addNavButton(row++, "+ ", Key.BTN_CREATE_MACRO, () ->
-                client.setScreen(new MacroEditorScreen(this, null)));
-
-        addNavButton(row++, "📋 ", Key.BTN_PLAYER_ACTIONS, () ->
-                client.setScreen(new ActionsConfigScreen(this)));
-
-        addNavButton(row++, "🕘 ", Key.BTN_HISTORY, () ->
-                client.setScreen(new ActionHistoryScreen(this)));
-
-        addNavButton(row++, "\uD83D\uDC64 ", Key.BTN_PROFILES, () ->
-                client.setScreen(new ProfilesScreen(this)));
-
-        addNavButton(row++, "⚙ ", Key.BTN_SETTINGS, () ->
-                client.setScreen(new SettingsScreen(this)));
-
-        row++;
-
-        button(
-                colX,
-                contentTop + row * ROW_STEP + 6,
-                COL_W,
-                WIDGET_H,
-                Key.BTN_CLOSE,
-                b -> close()
+        shell.tabs(
+                new StShell.Tab(Key.AUDIT_TAB_LOG, Key.HINT_TAB_GENERAL,
+                        () -> switchTab(TAB_GENERAL)),
+                new StShell.Tab(Key.MENU_SECTION_TOOLS, Key.HINT_TAB_INTERFACE,
+                        () -> switchTab(TAB_INTERFACE)),
+                new StShell.Tab(Key.HUD_TITLE, Key.HINT_TAB_CHAT,
+                        () -> switchTab(TAB_CHAT)),
+                new StShell.Tab(Key.MENU_SECTION_SYSTEM, Key.HINT_TAB_SYSTEM,
+                        () -> switchTab(TAB_SYSTEM))
         );
 
-        panelBottom =
-                contentTop + (row + 1) * ROW_STEP + 6 + WIDGET_H + 10;
-
-        // bottom-right corner: nick-detection settings + themes picker
-        addDrawableChild(
-                new StButton(
-                        width - 190,
-                        height - 28,
-                        88,
-                        20,
-                        Text.literal("\uD83D\uDD0D ")
-                                .append(Lang.text(Key.BTN_DETECTION)),
-                        b -> client.setScreen(
-                                new DetectionSettingsScreen(this)
-                        ),
-                        nextSlot(),
-                        Ui.ACCENT
-                )
-        );
-
-        addDrawableChild(
-                new StButton(
-                        width - 96,
-                        height - 28,
-                        88,
-                        20,
-                        Text.literal("\uD83C\uDFA8 ")
-                                .append(Lang.text(Key.BTN_THEMES)),
-                        b -> client.setScreen(new ThemesScreen()),
-                        nextSlot(),
-                        Ui.ACCENT
-                )
-        );
+        shell.activeTab(tab);
+        shell.activeRail(-1);
     }
 
-    private void addNavButton(
-            int row,
-            String icon,
-            String key,
-            Runnable action
-    ) {
+    private void switchTab(int next) {
 
-        addDrawableChild(
-                new StButton(
-                        colX,
-                        contentTop + row * ROW_STEP,
-                        COL_W,
-                        WIDGET_H,
-                        Text.literal(icon)
-                                .append(Lang.text(key)),
-                        b -> action.run(),
-                        nextSlot(),
-                        Ui.ACCENT
-                )
-        );
+        if (tab == next) {
+            return;
+        }
+
+        tab = next;
+        langOpen = false;
+
+        init();
     }
+
+    @Override
+    protected String shellStatus() {
+
+        String server = PunishmentHistory.currentServerKey();
+
+        return server == null || server.isBlank()
+                ? Lang.t(Key.HUD_OFFLINE)
+                : server;
+    }
+
+    @Override
+    protected int shellTitleAnimation() {
+        return StafftoolsClient.getConfig().getTitleAnimation();
+    }
+
+    // ------------------------------------------------------------------
+    // rendering
+    // ------------------------------------------------------------------
 
     @Override
     protected void renderTheme(
@@ -144,294 +129,887 @@ public class StafftoolsScreen extends StScreen {
             float alpha
     ) {
 
-        Ui.drawPanel(
-                context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
+        hits.clear();
+        frameDelta = delta;
+
+        int x = contentLeft();
+        int w = contentWidth();
+        int y = contentTop();
+
+        if (tab == TAB_GENERAL) {
+            int top = contentTop();
+            int bottom = contentBottom();
+            int viewportHeight = Math.max(1, bottom - top);
+            int maxScroll = generalMaxScroll(w);
+
+            generalScroll = Math.clamp(generalScroll, 0, maxScroll);
+            context.enableScissor(x, top, x + w, bottom);
+            renderGeneral(
+                    context,
+                    x,
+                    y - generalScroll,
+                    w,
+                    mouseX,
+                    mouseY,
+                    alpha
+            );
+            context.disableScissor();
+
+            if (maxScroll > 0) {
+                Ui.drawScrollFade(
+                        context,
+                        x,
+                        top,
+                        w,
+                        bottom,
+                        Ui.clamp01(generalScroll / 12f),
+                        Ui.clamp01((maxScroll - generalScroll) / 12f),
+                        alpha
+                );
+                Ui.drawScrollbar(
+                        context,
+                        x + w - 4,
+                        top,
+                        viewportHeight,
+                        generalScroll / (float) maxScroll,
+                        viewportHeight / (float) (viewportHeight + maxScroll),
+                        alpha
+                );
+            }
+
+            return;
+        }
+
+        switch (tab) {
+
+            case TAB_INTERFACE -> renderInterface(context, x, y, w, mouseX, mouseY, alpha);
+            case TAB_CHAT -> renderChat(context, x, y, w, mouseX, mouseY, alpha);
+            case TAB_SYSTEM -> renderSystem(context, x, y, w, mouseX, mouseY, alpha);
+            default -> {
+            }
+        }
+    }
+
+    private int generalMaxScroll(int width) {
+
+        int perRow = Math.max(
+                1,
+                (width - 150) / (SWATCH + SWATCH_GAP)
+        );
+        int themeRows = (Theme.count() + perRow - 1) / perRow;
+        int swatchHeight = themeRows * (SWATCH + SWATCH_GAP)
+                - SWATCH_GAP;
+        int contentHeight =
+                GENERAL_LANGUAGE_TITLE_GAP
+                        + GENERAL_LANGUAGE_HEIGHT
+                        + GENERAL_LANGUAGE_GAP
+                        + GENERAL_ACCENT_TITLE_GAP
+                        + swatchHeight
+                        + GENERAL_SWITCH_GAP
+                        + GENERAL_SWITCH_ROWS * ROW_H
+                        + (GENERAL_SWITCH_ROWS - 1) * GENERAL_ROW_GAP;
+
+        return Math.max(
+                0,
+                contentHeight - (contentBottom() - contentTop())
+        );
+    }
+
+    @Override
+    public boolean mouseScrolled(
+            double mouseX,
+            double mouseY,
+            double horizontalAmount,
+            double verticalAmount
+    ) {
+
+        if (tab == TAB_GENERAL &&
+                mouseX >= contentLeft() &&
+                mouseX <= contentLeft() + contentWidth() &&
+                mouseY >= contentTop() &&
+                mouseY <= contentBottom() &&
+                verticalAmount != 0) {
+
+            generalScroll = Math.clamp(
+                    generalScroll + (verticalAmount > 0 ? -32 : 32),
+                    0,
+                    generalMaxScroll(contentWidth())
+            );
+            return true;
+        }
+
+        return super.mouseScrolled(
+                mouseX,
+                mouseY,
+                horizontalAmount,
+                verticalAmount
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // General tab
+    // ------------------------------------------------------------------
+
+    private void renderGeneral(
+            DrawContext context,
+            int x,
+            int y,
+            int w,
+            int mouseX,
+            int mouseY,
+            float alpha
+    ) {
+
+        // --- language ---
+        Ui.drawSectionTitle(
+                context, textRenderer,
+                x, y,
+                "\u25C9",
+                Lang.t(Key.TOGGLE_LANGUAGE),
+                Lang.t(Key.MSG_LANGUAGE_HINT),
                 alpha
         );
 
-        // animated overlay frame, synced with the live theme
-        Ui.drawOrbitFrame(
-                context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
+        y += GENERAL_LANGUAGE_TITLE_GAP;
+
+        int selectW = Math.min(300, w);
+
+        boolean langHovered =
+                mouseX >= x && mouseX <= x + selectW &&
+                        mouseY >= y &&
+                                mouseY <= y + GENERAL_LANGUAGE_HEIGHT;
+        float langHover = hoverAmount("language-select", langHovered);
+
+        Ui.drawSelect(
+                context, textRenderer,
+                x, y, selectW, GENERAL_LANGUAGE_HEIGHT,
+                Lang.getLanguage().getDisplayName(),
+                langOpen, langHover, alpha
+        );
+
+        hits.add(new Object[]{
+                "lang", x, y, selectW, GENERAL_LANGUAGE_HEIGHT
+        });
+
+        if (langOpen) {
+
+            Lang.Language[] values = Lang.Language.values();
+
+            int menuY = y + 28;
+
+            for (int i = 0; i < values.length; i++) {
+
+                int itemY = menuY + i * 20;
+
+                boolean over =
+                        mouseX >= x && mouseX <= x + selectW &&
+                                mouseY >= itemY && mouseY <= itemY + 20;
+
+                Ui.drawRoundRect(
+                        context, x, itemY, selectW, 20,
+                        Design.RADIUS_SM,
+                        Ui.argb(
+                                over
+                                        ? Ui.mix(Ui.SURFACE, Ui.ACCENT, 0.20f)
+                                        : Ui.SURFACE_2,
+                                alpha
+                        )
+                );
+
+                context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(values[i].getDisplayName()),
+                        x + 10,
+                        itemY + 6,
+                        Ui.argb(
+                                values[i] == Lang.getLanguage()
+                                        ? Ui.ACCENT
+                                        : Ui.TEXT,
+                                alpha
+                        )
+                );
+
+                hits.add(new Object[]{"lang:" + i, x, itemY, selectW, 20});
+            }
+        }
+
+        y += GENERAL_LANGUAGE_GAP;
+
+        // --- accent colour ---
+        Ui.drawSectionTitle(
+                context, textRenderer,
+                x, y,
+                "\u25D0",
+                Lang.t(Key.LABEL_ACCENT_COLOR),
+                Lang.t(Key.MSG_ACCENT_HINT),
                 alpha
         );
 
-        drawLogo(context, width / 2, LOGO_Y, alpha);
+        y += GENERAL_ACCENT_TITLE_GAP;
 
-        // a fresh slogan on every visit
-        context.drawCenteredTextWithShadow(
+        int perRow = Math.max(
+                1,
+                (w - 150) / (SWATCH + SWATCH_GAP)
+        );
+
+        int col = 0;
+        int rowY = y;
+
+        for (int i = 0; i < Theme.count(); i++) {
+
+            int sx = x + col * (SWATCH + SWATCH_GAP);
+
+            boolean selected = i == Theme.getIndex();
+
+            boolean hovered =
+                    mouseX >= sx && mouseX <= sx + SWATCH &&
+                            mouseY >= rowY && mouseY <= rowY + SWATCH;
+            float hover = hoverAmount("theme-" + i, hovered);
+
+            Ui.drawSwatch(
+                    context,
+                    sx, rowY, SWATCH,
+                    Theme.accentOf(i),
+                    selected, hover, alpha
+            );
+
+            hits.add(new Object[]{"theme:" + i, sx, rowY, SWATCH, SWATCH});
+
+            col++;
+
+            if (col >= perRow) {
+                col = 0;
+                rowY += SWATCH + SWATCH_GAP;
+            }
+        }
+
+        // the swatch block must never run under the custom colour card
+        int swatchRows = (Theme.count() + perRow - 1) / perRow;
+        int swatchBottom = y
+                + swatchRows * (SWATCH + SWATCH_GAP)
+                - SWATCH_GAP;
+
+        // custom colour card on the right, like the reference
+        int cardW = 132;
+        int cardX = x + w - cardW;
+
+        Ui.drawRoundRect(
+                context, cardX, y, cardW, 44,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.SURFACE, alpha)
+        );
+
+        Ui.drawRoundBorder(
+                context, cardX, y, cardW, 44,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.BORDER, alpha)
+        );
+
+        Ui.drawRoundRect(
+                context, cardX + 8, y + 10, 24, 24,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.NICK_HIGHLIGHT, alpha)
+        );
+
+        // the label is trimmed to the space left of the card edge, so it
+        // can never spill outside the panel
+        int labelW = cardW - 40 - 8;
+
+        context.drawTextWithShadow(
                 textRenderer,
-                Text.literal(tagline),
-                width / 2,
-                TAGLINE_Y,
+                Text.literal(
+                        textRenderer.trimToWidth(
+                                Lang.t(Key.LABEL_ACCENT_COLOR),
+                                labelW
+                        )
+                ),
+                cardX + 40,
+                y + 12,
+                Ui.argb(Ui.TEXT, alpha)
+        );
+
+        context.drawTextWithShadow(
+                textRenderer,
+                Text.literal(String.format(
+                        "#%06X",
+                        Ui.NICK_HIGHLIGHT & 0xFFFFFF
+                )),
+                cardX + 40,
+                y + 24,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
         );
 
-        long now = System.currentTimeMillis();
+        hits.add(new Object[]{"nick", cardX, y, cardW, 44});
 
-        // tied to the ENTRANCE PROGRESS itself (not wall-clock),
-        // so the lines always fade in together with the panel:
-        // line 1 during the first half of the entrance,
-        // line 2 during the second half.
-        float line1A =
-                Ui.clamp01(
-                        (alpha - 0.30f) / 0.45f
-                );
+        y = swatchBottom + GENERAL_SWITCH_GAP;
 
-        float line2A =
-                Ui.clamp01(
-                        (alpha - 0.55f) / 0.45f
-                );
+        // --- quick switches, two columns ---
+        StaffToolsConfig config = StafftoolsClient.getConfig();
 
-        // above the nav column ("before Макросы")
-        int line1Y = contentTop - 8;
+        int colGap = 10;
+        int colW = (w - colGap) / 2;
 
-        if (line1A > 0.01f) {
+        String[][] left = {
+                {"actions", Lang.t(Key.TOGGLE_ACTIONS_POPUP)},
+                {"confirm", Lang.t(Key.TOGGLE_CONFIRM_DANGER)},
+                {"toasts", Lang.t(Key.TOGGLE_TOASTS)}
+        };
 
-            context.fill(
-                    colX,
-                    line1Y,
-                    colX + COL_W,
-                    line1Y + 1,
-                    Ui.argb(0xFF2C3B55, line1A)
+        String[][] right = {
+                {"chatInput", Lang.t(Key.TOGGLE_CHAT_INPUT)},
+                {"chatFrame", Lang.t(Key.TOGGLE_CHAT_FRAME)},
+                {"modHud", Lang.t(Key.TOGGLE_MOD_HUD)}
+        };
+
+        for (int i = 0; i < left.length; i++) {
+
+            int ry = y + i * (ROW_H + GENERAL_ROW_GAP);
+
+            drawToggle(
+                    context, left[i][0], left[i][1],
+                    x, ry, colW,
+                    toggleValue(config, left[i][0]),
+                    mouseX, mouseY, alpha
             );
 
-            drawShimmerLine(
-                    context, now,
-                    line1Y, line1A
-            );
-        }
-
-        // right below the last nav row ("after Профили")
-        int line2Y = contentTop + 6 * ROW_STEP;
-
-        if (line2A > 0.01f) {
-
-            context.fill(
-                    colX,
-                    line2Y,
-                    colX + COL_W,
-                    line2Y + 1,
-                    Ui.argb(0xFF2C3B55, line2A)
-            );
-
-            drawShimmerLine(
-                    context, now + 1600,
-                    line2Y, line2A
+            drawToggle(
+                    context, right[i][0], right[i][1],
+                    x + colW + colGap, ry, colW,
+                    toggleValue(config, right[i][0]),
+                    mouseX, mouseY, alpha
             );
         }
     }
 
-    /**
-     * A soft accent segment gliding along a separator line
-     * with a ping-pong motion (no wrap-around jump).
-     */
-    private void drawShimmerLine(
+    // ------------------------------------------------------------------
+    // Interface tab
+    // ------------------------------------------------------------------
+
+    private void renderInterface(
             DrawContext context,
-            long time,
+            int x,
             int y,
+            int w,
+            int mouseX,
+            int mouseY,
             float alpha
     ) {
 
-        // modulo in LONG space: float loses all precision
-        // at epoch-scale timestamps (~131s steps)
-        float raw =
-                (time % 4200L) / 4200f;
+        Ui.drawSectionTitle(
+                context, textRenderer,
+                x, y,
+                "\u25A6",
+                Lang.t(Key.MENU_SECTION_TOOLS),
+                Lang.t(Key.MSG_INTERFACE_HINT),
+                alpha
+        );
 
-        float t =
-                1f - Math.abs(raw * 2f - 1f);
+        y += 34;
 
-        int segW = Math.min(48, COL_W / 4);
+        StaffToolsConfig config = StafftoolsClient.getConfig();
 
-        int travel = COL_W - segW;
+        int colGap = 10;
+        int colW = (w - colGap) / 2;
 
-        int gx = colX + (int) (travel * t);
+        String[][] left = {
+                {"actions", Lang.t(Key.TOGGLE_ACTIONS_POPUP)},
+                {"confirm", Lang.t(Key.TOGGLE_CONFIRM_DANGER)},
+                {"toasts", Lang.t(Key.TOGGLE_TOASTS)},
+                {"anim", Lang.t(Key.TOGGLE_MENU_ANIMATION)},
+                {"savePopup", Lang.t(Key.TOGGLE_SAVE_POPUP_SIZE)}
+        };
 
-        int gxEnd = gx + segW;
+        String[][] right = {
+                {"chatFrame", Lang.t(Key.TOGGLE_CHAT_FRAME)},
+                {"chatResize", Lang.t(Key.TOGGLE_CHAT_RESIZE)},
+                {"saveChat", Lang.t(Key.TOGGLE_SAVE_CHAT_SIZE)},
+                {"modHud", Lang.t(Key.TOGGLE_MOD_HUD)},
+                {"modHudPhrases", Lang.t(Key.TOGGLE_MOD_HUD_PHRASES)}
+        };
 
-        int midStart = Math.max(gx, colX);
-        int midEnd = Math.min(gxEnd, colX + COL_W);
+        for (int i = 0; i < left.length; i++) {
 
-        if (midEnd > midStart) {
+            int ry = y + i * (ROW_H + ROW_GAP);
 
-            context.fill(
-                    midStart,
-                    y,
-                    midEnd,
-                    y + 1,
-                    Ui.argb(Ui.ACCENT, alpha * 0.65f)
+            drawToggle(
+                    context, left[i][0], left[i][1],
+                    x, ry, colW,
+                    toggleValue(config, left[i][0]),
+                    mouseX, mouseY, alpha
+            );
+
+            drawToggle(
+                    context, right[i][0], right[i][1],
+                    x + colW + colGap, ry, colW,
+                    toggleValue(config, right[i][0]),
+                    mouseX, mouseY, alpha
             );
         }
 
-        int edge = gx < colX ? colX : gxEnd > colX + COL_W ? colX + COL_W - 1 : -1;
+        y += left.length * (ROW_H + ROW_GAP) + 14;
 
-        if (edge >= 0) {
-
-            context.fill(
-                    edge,
-                    y,
-                    edge + 1,
-                    y + 1,
-                    Ui.argb(Ui.ACCENT, alpha * 0.35f)
-            );
-        }
+        drawNavRow(context, x, y, w, mouseX, mouseY, alpha);
     }
 
-    /**
-     * Animated text logo with 4 random variants picked on screen open:
-     * 0 = wave, 1 = comet, 2 = float, 3 = ripple.
-     * All motion is sub-pixel smooth via matrix translation.
-     */
-    private void drawLogo(
+    // ------------------------------------------------------------------
+    // Chat tab
+    // ------------------------------------------------------------------
+
+    private void renderChat(
             DrawContext context,
-            int cx,
-            int cy,
+            int x,
+            int y,
+            int w,
+            int mouseX,
+            int mouseY,
             float alpha
     ) {
 
-        long now = System.currentTimeMillis();
+        Ui.drawSectionTitle(
+                context, textRenderer,
+                x, y,
+                "\u25C8",
+                Lang.t(Key.TITLE_DETECTION),
+                Lang.t(Key.MSG_DETECT_HINT),
+                alpha
+        );
 
-        var matrices = context.getMatrices();
+        y += 34;
 
-        int total =
-                textRenderer.getWidth(LOGO_TEXT);
+        StaffToolsConfig config = StafftoolsClient.getConfig();
 
-        int x = cx - total / 2;
+        int colGap = 10;
+        int colW = (w - colGap) / 2;
 
-        int len = LOGO_TEXT.length();
+        String[][] left = {
+                {"plain", Lang.t(Key.TOGGLE_DETECT_PLAIN)},
+                {"cache", Lang.t(Key.TOGGLE_DETECT_CACHE)},
+                {"display", Lang.t(Key.TOGGLE_DETECT_DISPLAY)},
+                {"aliases", Lang.t(Key.TOGGLE_DETECT_ALIASES)},
+                {"click", Lang.t(Key.TOGGLE_DETECT_CLICK)}
+        };
 
-        int center = (len - 1) / 2;
+        String[][] right = {
+                {"hover", Lang.t(Key.TOGGLE_DETECT_HOVER)},
+                {"unicode", Lang.t(Key.TOGGLE_DETECT_UNICODE)},
+                {"decor", Lang.t(Key.TOGGLE_DETECT_DECOR)},
+                {"line", Lang.t(Key.TOGGLE_DETECT_LINE)},
+                {"chatInput", Lang.t(Key.TOGGLE_CHAT_INPUT)}
+        };
 
-        // ping-pong 0 -> 1 -> 0, no wrap-around jump
-        // (modulo in long space — see drawShimmerLine)
-        float cometRaw =
-                (now % 3200L) / 3200f;
+        for (int i = 0; i < left.length; i++) {
 
-        float cometPos =
-                1f - Math.abs(cometRaw * 2f - 1f);
+            int ry = y + i * (ROW_H + ROW_GAP);
 
-        for (int i = 0; i < len; i++) {
-
-            char c = LOGO_TEXT.charAt(i);
-
-            int cw = textRenderer.getWidth(
-                    String.valueOf(c)
+            drawToggle(
+                    context, left[i][0], left[i][1],
+                    x, ry, colW,
+                    toggleValue(config, left[i][0]),
+                    mouseX, mouseY, alpha
             );
 
-            float offY;
-            float mixT;
+            drawToggle(
+                    context, right[i][0], right[i][1],
+                    x + colW + colGap, ry, colW,
+                    toggleValue(config, right[i][0]),
+                    mouseX, mouseY, alpha
+            );
+        }
 
-            switch (logoVariant) {
+        y += left.length * (ROW_H + ROW_GAP) + 14;
 
-                case 1 -> { // comet: glow traveling there and back
-                    float p = i / (float) (len - 1);
+        drawNavRow(context, x, y, w, mouseX, mouseY, alpha);
+    }
 
-                    float d = Math.abs(p - cometPos);
+    // ------------------------------------------------------------------
+    // System tab
+    // ------------------------------------------------------------------
 
-                    mixT = Math.max(0f, 1f - d * 4f);
+    private void renderSystem(
+            DrawContext context,
+            int x,
+            int y,
+            int w,
+            int mouseX,
+            int mouseY,
+            float alpha
+    ) {
 
-                    offY = -mixT * 1.2f;
-                }
+        Ui.drawSectionTitle(
+                context, textRenderer,
+                x, y,
+                "\u2699",
+                Lang.t(Key.MENU_SECTION_SYSTEM),
+                Lang.t(Key.MSG_SYSTEM_HINT),
+                alpha
+        );
 
-                case 2 -> { // float: whole word bobbing
-                    offY =
-                            (float) Math.sin(now / 650.0)
-                                    * 1.3f;
+        y += 34;
 
-                    mixT =
-                            0.5f + 0.5f *
-                                    (float) Math.sin(now / 1000.0);
-                }
+        StaffToolsConfig config = StafftoolsClient.getConfig();
 
-                case 3 -> { // ripple from the center out
-                    int dist = Math.abs(i - center);
+        int colGap = 10;
+        int colW = (w - colGap) / 2;
 
-                    offY =
-                            (float) Math.sin(
-                                    now / 480.0 - dist * 0.6
-                            ) * 1.1f;
+        drawToggle(
+                context, "audit", Lang.t(Key.TOGGLE_AUDIT),
+                x, y, colW,
+                toggleValue(config, "audit"),
+                mouseX, mouseY, alpha
+        );
 
-                    mixT =
-                            0.5f + 0.5f *
-                                    (float) Math.sin(
-                                            now / 950.0 - dist * 0.5
-                                    );
-                }
+        drawToggle(
+                context, "profiler", Lang.t(Key.TOGGLE_PROFILER),
+                x + colW + colGap, y, colW,
+                toggleValue(config, "profiler"),
+                mouseX, mouseY, alpha
+        );
 
-                default -> { // wave
-                    offY =
-                            (float) Math.sin(
-                                    now / 520.0 + i * 0.5
-                            ) * 1.1f;
+        y += ROW_H + ROW_GAP + 14;
 
-                    mixT =
-                            0.5f + 0.5f *
-                                    (float) Math.sin(
-                                            now / 850.0 + i * 0.45
-                                    );
-                }
-            }
+        drawNavRow(context, x, y, w, mouseX, mouseY, alpha);
+    }
 
-            int color = Ui.mix(
-                    Ui.TEXT,
-                    Ui.ACCENT_SOFT,
-                    mixT * 0.75f
+    // ------------------------------------------------------------------
+    // shared pieces
+    // ------------------------------------------------------------------
+
+    /** Navigation cards: macros, actions, history, profiles, audit. */
+    private void drawNavRow(
+            DrawContext context,
+            int x,
+            int y,
+            int w,
+            int mouseX,
+            int mouseY,
+            float alpha
+    ) {
+
+        String[][] entries = {
+                {"macros", "\u26A1", Lang.t(Key.BTN_MACROS)},
+                {"actions", "\uD83D\uDCCB", Lang.t(Key.BTN_PLAYER_ACTIONS)},
+                {"history", "\uD83D\uDD52", Lang.t(Key.BTN_HISTORY)},
+                {"profiles", "\uD83D\uDC64", Lang.t(Key.BTN_PROFILES)},
+                {"audit", "\uD83D\uDD0E", Lang.t(Key.BTN_AUDIT)},
+                {"settings", "\u2699", Lang.t(Key.BTN_SETTINGS)}
+        };
+
+        int gap = 8;
+        int cardW = (w - gap * 2) / 3;
+        int cardH = 34;
+
+        for (int i = 0; i < entries.length; i++) {
+
+            int cx = x + (i % 3) * (cardW + gap);
+            int cy = y + (i / 3) * (cardH + gap);
+
+            boolean hovered =
+                    mouseX >= cx && mouseX <= cx + cardW &&
+                            mouseY >= cy && mouseY <= cy + cardH;
+
+            Ui.drawRoundRect(
+                    context, cx, cy, cardW, cardH,
+                    Design.RADIUS_MD,
+                    Ui.argb(
+                            hovered
+                                    ? Ui.mix(Ui.SURFACE, Ui.ACCENT, 0.16f)
+                                    : Ui.SURFACE,
+                            alpha
+                    )
             );
 
-            matrices.pushMatrix();
-
-            matrices.translate(x, cy + offY);
+            Ui.drawRoundBorder(
+                    context, cx, cy, cardW, cardH,
+                    Design.RADIUS_MD,
+                    Ui.argb(hovered ? Ui.ACCENT : Ui.BORDER, alpha)
+            );
 
             context.drawTextWithShadow(
                     textRenderer,
-                    Text.literal(String.valueOf(c)),
-                    0,
-                    0,
-                    Ui.argb(color, alpha)
+                    Text.literal(entries[i][1]),
+                    cx + 10,
+                    cy + (cardH - 9) / 2,
+                    Ui.argb(hovered ? Ui.ACCENT : Ui.TEXT_MUTED, alpha)
             );
 
-            matrices.popMatrix();
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(
+                            textRenderer.trimToWidth(
+                                    entries[i][2],
+                                    cardW - 34
+                            )
+                    ),
+                    cx + 28,
+                    cy + (cardH - 9) / 2,
+                    Ui.argb(Ui.TEXT, alpha)
+            );
 
-            x += cw;
+            hits.add(new Object[]{"nav:" + entries[i][0], cx, cy, cardW, cardH});
         }
+    }
 
-        float breathe =
-                0.5f + 0.5f *
-                        (float) Math.sin(now / 1100.0);
+    /** One settings row with an animated pill toggle. */
+    private void drawToggle(
+            DrawContext context,
+            String id,
+            String label,
+            int x,
+            int y,
+            int w,
+            boolean value,
+            int mouseX,
+            int mouseY,
+            float alpha
+    ) {
 
-        int lineW =
-                (int) (total * (0.6f + 0.4f * breathe));
+        boolean hovered =
+                mouseX >= x && mouseX <= x + w &&
+                        mouseY >= y && mouseY <= y + ROW_H;
+        float hover = hoverAmount(id, hovered);
 
-        context.fill(
-                cx - lineW / 2,
-                cy + 13,
-                cx + lineW / 2,
-                cy + 14,
-                Ui.argb(
-                        Ui.ACCENT,
-                        alpha * (0.5f + 0.35f * breathe)
-                )
+        float target = value ? 1f : 0f;
+
+        float current = knobs.getOrDefault(id, target);
+
+        current = Ui.animateTowards(
+                current,
+                target,
+                frameDelta,
+                15f
         );
 
-        if (logoVariant == 1) {
+        knobs.put(id, current);
 
-            int hx = cx - total / 2 +
-                    (int) (total * cometPos);
+        Ui.drawToggleRow(
+                context, textRenderer,
+                x, y, w, ROW_H,
+                label, current, hover, alpha
+        );
 
-            context.fill(
-                    hx - 8,
-                    cy + 13,
-                    hx + 8,
-                    cy + 14,
-                    Ui.argb(Ui.ACCENT_SOFT, alpha * 0.9f)
-            );
+        hits.add(new Object[]{"toggle:" + id, x, y, w, ROW_H});
+    }
+
+    private float hoverAmount(String id, boolean hovered) {
+
+        float current = hoverAmounts.getOrDefault(id, 0f);
+        float next = Ui.animateTowards(
+                current,
+                hovered ? 1f : 0f,
+                frameDelta,
+                14f
+        );
+        hoverAmounts.put(id, next);
+        return next;
+    }
+
+    /** Current value of a setting by its short id. */
+    private static boolean toggleValue(
+            StaffToolsConfig config,
+            String id
+    ) {
+
+        return switch (id) {
+            case "actions" -> config.isPlayerActionsEnabled();
+            case "confirm" -> config.isDangerousMacroConfirmation();
+            case "toasts" -> config.isToastsEnabled();
+            case "anim" -> config.isMenuAnimation();
+            case "savePopup" -> config.isSavePopupSize();
+            case "chatFrame" -> config.isChatFrameEnabled();
+            case "chatResize" -> config.isChatResizeEnabled();
+            case "saveChat" -> config.isSaveChatSize();
+            case "modHud" -> config.isModHudEnabled();
+            case "modHudPhrases" -> config.isModHudPhrases();
+            case "plain" -> config.isDetectPlain();
+            case "cache" -> config.isDetectCache();
+            case "display" -> config.isDetectDisplay();
+            case "aliases" -> config.isDetectAliases();
+            case "click" -> config.isDetectClick();
+            case "hover" -> config.isDetectHover();
+            case "unicode" -> config.isDetectUnicode();
+            case "decor" -> config.isDetectDecor();
+            case "line" -> config.isDetectLine();
+            case "chatInput" -> config.isChatInputDetectEnabled();
+            case "audit" -> config.isAuditLogEnabled();
+            case "profiler" -> config.isProfilerEnabled();
+            default -> false;
+        };
+    }
+
+    /** Flips a setting by its short id and persists it. */
+    private static void flip(StaffToolsConfig config, String id) {
+
+        switch (id) {
+            case "actions" -> config.setPlayerActionsEnabled(
+                    !config.isPlayerActionsEnabled());
+            case "confirm" -> config.setDangerousMacroConfirmation(
+                    !config.isDangerousMacroConfirmation());
+            case "toasts" -> config.setToastsEnabled(
+                    !config.isToastsEnabled());
+            case "anim" -> config.setMenuAnimation(
+                    !config.isMenuAnimation());
+            case "savePopup" -> config.setSavePopupSize(
+                    !config.isSavePopupSize());
+            case "chatFrame" -> config.setChatFrameEnabled(
+                    !config.isChatFrameEnabled());
+            case "chatResize" -> config.setChatResizeEnabled(
+                    !config.isChatResizeEnabled());
+            case "saveChat" -> config.setSaveChatSize(
+                    !config.isSaveChatSize());
+            case "modHud" -> config.setModHudEnabled(
+                    !config.isModHudEnabled());
+            case "modHudPhrases" -> config.setModHudPhrases(
+                    !config.isModHudPhrases());
+            case "plain" -> config.setDetectPlain(
+                    !config.isDetectPlain());
+            case "cache" -> config.setDetectCache(
+                    !config.isDetectCache());
+            case "display" -> config.setDetectDisplay(
+                    !config.isDetectDisplay());
+            case "aliases" -> config.setDetectAliases(
+                    !config.isDetectAliases());
+            case "click" -> config.setDetectClick(
+                    !config.isDetectClick());
+            case "hover" -> config.setDetectHover(
+                    !config.isDetectHover());
+            case "unicode" -> config.setDetectUnicode(
+                    !config.isDetectUnicode());
+            case "decor" -> config.setDetectDecor(
+                    !config.isDetectDecor());
+            case "line" -> config.setDetectLine(
+                    !config.isDetectLine());
+            case "chatInput" -> config.setChatInputDetectEnabled(
+                    !config.isChatInputDetectEnabled());
+            case "audit" -> config.setAuditLogEnabled(
+                    !config.isAuditLogEnabled());
+            case "profiler" -> config.setProfilerEnabled(
+                    !config.isProfilerEnabled());
+            default -> {
+            }
+        }
+
+        StafftoolsClient.saveConfig();
+    }
+
+    // ------------------------------------------------------------------
+    // input
+    // ------------------------------------------------------------------
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubled) {
+
+        if (click.button() == 0) {
+            if (tab == TAB_GENERAL &&
+                    (click.y() < contentTop() ||
+                            click.y() > contentBottom())) {
+                langOpen = false;
+                return super.mouseClicked(click, doubled);
+            }
+
+            for (Object[] hit : hits) {
+
+                int hx = (int) hit[1];
+                int hy = (int) hit[2];
+                int hw = (int) hit[3];
+                int hh = (int) hit[4];
+
+                if (click.x() < hx || click.x() > hx + hw ||
+                        click.y() < hy || click.y() > hy + hh) {
+
+                    continue;
+                }
+
+                String id = (String) hit[0];
+
+                if (id.equals("lang")) {
+
+                    langOpen = !langOpen;
+                    return true;
+                }
+
+                if (id.startsWith("lang:")) {
+
+                    int index = Integer.parseInt(id.substring(5));
+
+                    Lang.setLanguage(Lang.Language.values()[index]);
+
+                    StafftoolsClient.getConfig()
+                            .setLanguage(Lang.getLanguage());
+
+                    StafftoolsClient.saveConfig();
+
+                    langOpen = false;
+
+                    init();
+
+                    return true;
+                }
+
+                if (id.startsWith("theme:")) {
+
+                    int index = Integer.parseInt(id.substring(6));
+
+                    StafftoolsClient.getConfig().setThemeIndex(index);
+
+                    Theme.apply(index);
+
+                    StafftoolsClient.saveConfig();
+
+                    Ui.playHover();
+
+                    init();
+
+                    return true;
+                }
+
+                if (id.equals("nick")) {
+
+                    client.setScreen(new ThemesScreen());
+
+                    return true;
+                }
+
+                if (id.startsWith("toggle:")) {
+
+                    flip(
+                            StafftoolsClient.getConfig(),
+                            id.substring(7)
+                    );
+
+                    Ui.playHover();
+
+                    return true;
+                }
+
+                if (id.startsWith("nav:")) {
+
+                    openNav(id.substring(4));
+
+                    return true;
+                }
+            }
+
+            // a click outside the language menu closes it
+            if (langOpen) {
+                langOpen = false;
+                return true;
+            }
+        }
+
+        return super.mouseClicked(click, doubled);
+    }
+
+    private void openNav(String id) {
+
+        switch (id) {
+            case "macros" -> client.setScreen(new MacroListScreen(this));
+            case "actions" -> client.setScreen(new ActionsConfigScreen(this));
+            case "history" -> client.setScreen(new ActionHistoryScreen(this));
+            case "profiles" -> client.setScreen(new ProfilesScreen(this));
+            case "audit" -> client.setScreen(new AuditScreen(this));
+            case "settings" -> client.setScreen(new SettingsScreen(this));
+            default -> {
+            }
         }
     }
 }

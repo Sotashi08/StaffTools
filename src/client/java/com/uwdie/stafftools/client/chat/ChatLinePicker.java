@@ -2,9 +2,11 @@ package com.uwdie.stafftools.client.chat;
 
 import com.uwdie.stafftools.client.mixin.ChatHudAccessor;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.gui.hud.ChatHudLine;
 import net.minecraft.text.OrderedText;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 
 import java.util.List;
@@ -12,18 +14,14 @@ import java.util.List;
 /**
  * Finds the word the cursor sits on inside a rendered chat line.
  *
- * Vanilla itself resolves the click position to a {@code Style} with
- * exactly this math ({@code ChatHud#getTextStyleAt}); 1.21.11 no longer
- * exposes the line lookup, so the index is computed here from the same
- * values the renderer uses — chat scale, chat width, line height, the
- * visible line count and the current scroll offset.
+ * The line lookup uses the chat scale, width, line height, visible line
+ * count and scroll offset used by the renderer. Within a line, cursor X
+ * is matched against rendered glyph advances rather than treated as a
+ * character index.
  *
- * Chat plugins are the reason the lookup is layered: a plugin may add its
- * own chat lines, shift the chat box, or send text with no click data at
- * all. So the exact vanilla hit-test is tried first, and when it finds
- * nothing the search widens to the whole chat area and returns the word
- * of the nearest line. That keeps the click-to-popup usable even where
- * the strict maths would miss.
+ * The line under the cursor is checked first. If it contains no word,
+ * the nearest visible line is checked to tolerate small vertical
+ * rounding differences.
  */
 public final class ChatLinePicker {
 
@@ -147,16 +145,15 @@ public final class ChatLinePicker {
             return null;
         }
 
-        // the char index is the floored line X, exactly like vanilla
-        int charAt = MathHelper.floor(lineX);
+        String text = textOf(line.content());
 
-        if (charAt < 0) {
+        if (text.isEmpty()) {
             return null;
         }
 
-        String text = textOf(line.content());
+        int charAt = characterAt(line.content(), text, lineX);
 
-        if (text.isEmpty() || charAt >= text.length()) {
+        if (charAt < 0 || charAt >= text.length()) {
             return null;
         }
 
@@ -179,6 +176,83 @@ public final class ChatLinePicker {
         String word = text.substring(start, end);
 
         return word.isEmpty() ? null : word;
+    }
+
+    /**
+     * Maps a rendered X position to the UTF-16 offset of its glyph.
+     * Styled glyph widths are measured separately so bold/custom-font
+     * text uses the same advances as the displayed line.
+     */
+    private static int characterAt(
+            OrderedText ordered,
+            String text,
+            double lineX
+    ) {
+
+        if (lineX < 0.0) {
+            return -1;
+        }
+
+        TextRenderer renderer =
+                MinecraftClient.getInstance().textRenderer;
+
+        int[] glyphWidths = new int[
+                text.codePointCount(0, text.length())
+        ];
+        int[] glyphCount = {0};
+
+        ordered.accept((index, style, codePoint) -> {
+
+            if (glyphCount[0] >= glyphWidths.length) {
+                return false;
+            }
+
+            String glyph = new String(Character.toChars(codePoint));
+            glyphWidths[glyphCount[0]++] = renderer.getWidth(
+                    Text.literal(glyph).setStyle(style)
+            );
+            return true;
+        });
+
+        return characterAt(text, lineX, glyphWidths, glyphCount[0]);
+    }
+
+    static int characterAt(
+            String text,
+            double lineX,
+            int[] glyphWidths,
+            int glyphCount
+    ) {
+
+        if (lineX < 0.0 || text == null || text.isEmpty()) {
+            return -1;
+        }
+
+        double cursorX = 0.0;
+        int availableGlyphs = Math.min(
+                glyphCount,
+                Math.min(
+                        glyphWidths.length,
+                        text.codePointCount(0, text.length())
+                )
+        );
+
+        for (int i = 0; i < availableGlyphs; i++) {
+
+            int width = glyphWidths[i];
+            double glyphRight = cursorX + width;
+
+            if (width > 0 &&
+                    lineX >= cursorX &&
+                    lineX < glyphRight) {
+
+                return text.offsetByCodePoints(0, i);
+            }
+
+            cursorX = glyphRight;
+        }
+
+        return -1;
     }
 
     /** Renders an ordered text back into a plain string. */

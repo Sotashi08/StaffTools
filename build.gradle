@@ -21,6 +21,25 @@ loom {
     }
 }
 
+// Add test source set
+sourceSets {
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
+        }
+    }
+}
+
+// Configure test task for JUnit 5
+tasks.named('test') {
+    useJUnitPlatform()
+    // Don't fail if no tests found (for when test source set is empty)
+    failOnNoDiscoveredTests = false
+}
+
 fabricApi {
     configureDataGeneration {
         client = true
@@ -42,6 +61,11 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Test dependencies
+    testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
+    testImplementation "org.mockito:mockito-core:5.11.0"
+    testImplementation "org.mockito:mockito-junit-jupiter:5.11.0"
 }
 
 processResources {
@@ -67,6 +91,11 @@ tasks.withType(JavaCompile).configureEach {
     if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
         it.options.release.set(targetJavaVersion)
     }
+}
+
+// Configure test JVM to use Java 21
+tasks.withType(Test) {
+    jvmArgs = ['--add-opens=java.base/java.lang=ALL-UNNAMED']
 }
 
 java {

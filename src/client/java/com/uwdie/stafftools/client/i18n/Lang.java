@@ -68,6 +68,10 @@ public final class Lang {
         public static final String THEME_NICK_AUTO =
                 "theme.nickAuto";
 
+        /** Label of the interface accent colour picker. */
+        public static final String LABEL_ACCENT_COLOR =
+                "label.accentColor";
+
         // Titles / hints
         public static final String TITLE_DETECTION = "title.detection";
         public static final String TITLE_PROFILES = "title.profiles";
@@ -91,6 +95,11 @@ public final class Lang {
         public static final String THEME_AURORA = "theme.aurora";
         public static final String THEME_NEON = "theme.neon";
         public static final String THEME_SUNSET = "theme.sunset";
+        public static final String THEME_TWILIGHT = "theme.twilight";
+        public static final String THEME_SAKURA = "theme.sakura";
+        public static final String THEME_GLACIER = "theme.glacier";
+        public static final String THEME_MINT = "theme.mint";
+        public static final String THEME_PLUM = "theme.plum";
 
         // Toggles
         public static final String TOGGLE_CHAT_MENTIONS = "toggle.chatMentions";
@@ -115,6 +124,20 @@ public final class Lang {
                 "toggle.modHudPhrases";
         public static final String TOGGLE_MENU_ANIMATION =
                 "toggle.menuAnimation";
+        public static final String TITLE_ANIMATION_LABEL =
+                "title.animation.label";
+        public static final String TITLE_ANIMATION_STATIC =
+                "title.animation.static";
+        public static final String TITLE_ANIMATION_AURORA =
+                "title.animation.aurora";
+        public static final String TITLE_ANIMATION_PULSE =
+                "title.animation.pulse";
+        public static final String TITLE_ANIMATION_SWEEP =
+                "title.animation.sweep";
+        public static final String ANIMATION_SPEED =
+                "settings.animationSpeed";
+        public static final String GLOW_INTENSITY =
+                "settings.glowIntensity";
         public static final String TOGGLE_CHAT_RESIZE =
                 "toggle.chatResize";
 
@@ -129,6 +152,8 @@ public final class Lang {
                 "toggle.detectHover";
         public static final String TOGGLE_DETECT_ALIASES =
                 "toggle.detectAliases";
+        public static final String TOGGLE_NICK_HIGHLIGHT_DISABLED =
+                "toggle.nickHighlightDisabled";
         public static final String TOGGLE_DETECT_UNICODE =
                 "toggle.detectUnicode";
         public static final String TOGGLE_DETECT_DECOR =
@@ -211,10 +236,6 @@ public final class Lang {
         public static final String HUD_SESSION = "hud.session";
         public static final String HUD_PUNISHED = "hud.punished";
         public static final String HUD_OFFLINE = "hud.offline";
-
-        // Chat hover
-        public static final String HOVER_CLICK = "hover.click";
-        public static final String HOVER_SHIFT_CLICK = "hover.shiftClick";
 
         // profile actions
         public static final String BTN_PROFILE_CREATE = "btn.profileCreate";
@@ -306,6 +327,86 @@ public final class Lang {
         public static final String DETAIL_SERVER_REPLY = "detail.serverReply";
         public static final String DETAIL_UNKNOWN = "detail.unknown";
         public static final String DETAIL_NONE = "detail.none";
+
+        // Manual punishment resolution
+        public static final String BTN_MARK_DONE = "btn.markDone";
+        public static final String BTN_MARK_FAILED = "btn.markFailed";
+        public static final String BTN_MARK_PENDING = "btn.markPending";
+        public static final String TOAST_MARKED_DONE = "toast.markedDone";
+        public static final String TOAST_MARKED_FAILED = "toast.markedFailed";
+        public static final String TOAST_MARKED_PENDING = "toast.markedPending";
+
+        // Audit log + profiler
+        public static final String BTN_AUDIT = "btn.audit";
+        public static final String TITLE_AUDIT = "title.audit";
+        public static final String MSG_AUDIT_HINT = "msg.auditHint";
+        public static final String MSG_AUDIT_EMPTY = "msg.auditEmpty";
+        public static final String AUDIT_TAB_LOG = "audit.tabLog";
+        public static final String AUDIT_TAB_PROFILE = "audit.tabProfile";
+        public static final String AUDIT_FILTER_ALL = "audit.filterAll";
+        public static final String AUDIT_CLEAR = "audit.clear";
+        public static final String AUDIT_CLEARED = "audit.cleared";
+        public static final String AUDIT_CAT_MACRO = "audit.cat.macro";
+        public static final String AUDIT_CAT_DETECT = "audit.cat.detect";
+        public static final String AUDIT_CAT_PUNISH = "audit.cat.punish";
+        public static final String AUDIT_CAT_CONFIG = "audit.cat.config";
+        public static final String AUDIT_CAT_CHAT = "audit.cat.chat";
+        public static final String AUDIT_CAT_ERROR = "audit.cat.error";
+        public static final String PROF_SECTION = "prof.section";
+        public static final String PROF_CALLS = "prof.calls";
+        public static final String PROF_AVG = "prof.avg";
+        public static final String PROF_MAX = "prof.max";
+        public static final String PROF_TOTAL = "prof.total";
+        public static final String PROF_TRACE = "prof.trace";
+        public static final String PROF_RESET = "prof.reset";
+        public static final String PROF_EMPTY = "prof.empty";
+        public static final String TOGGLE_AUDIT = "toggle.audit";
+        public static final String TOGGLE_PROFILER = "toggle.profiler";
+
+        // Command preview
+        public static final String PREVIEW_TITLE = "preview.title";
+        public static final String PREVIEW_EXAMPLE = "preview.example";
+        public static final String PREVIEW_EMPTY = "preview.empty";
+
+        // Nick hover statistics
+        public static final String HOVER_STATS_ONLINE = "hover.stats.online";
+        public static final String HOVER_STATS_OFFLINE = "hover.stats.offline";
+        public static final String HOVER_STATS_PING = "hover.stats.ping";
+        public static final String HOVER_STATS_GAMEMODE = "hover.stats.gamemode";
+        public static final String HOVER_STATS_PUNISH = "hover.stats.punish";
+        public static final String HOVER_STATS_SERVER = "hover.stats.server";
+        public static final String HOVER_STATS_OPEN = "hover.stats.open";
+
+        // Drag and drop
+        public static final String MSG_DRAG_HINT = "msg.dragHint";
+
+        // Main menu dashboard
+        public static final String MENU_SECTION_TOOLS = "menu.sectionTools";
+        public static final String MENU_SECTION_SYSTEM = "menu.sectionSystem";
+        public static final String MENU_STAT_MACROS = "menu.statMacros";
+        public static final String MENU_STAT_ACTIONS = "menu.statActions";
+        public static final String MENU_STAT_PUNISH = "menu.statPunish";
+        public static final String MENU_STAT_SESSION = "menu.statSession";
+        public static final String MENU_PROFILE = "menu.profile";
+
+        // Launcher-style hints
+        public static final String MSG_LANGUAGE_HINT = "msg.languageHint";
+        public static final String MSG_ACCENT_HINT = "msg.accentHint";
+        public static final String MSG_INTERFACE_HINT = "msg.interfaceHint";
+        public static final String MSG_SYSTEM_HINT = "msg.systemHint";
+        public static final String MSG_EDITOR_HINT = "msg.editorHint";
+
+        // Rail / tab tooltips
+        public static final String HINT_RAIL_MACROS = "hint.rail.macros";
+        public static final String HINT_RAIL_ACTIONS = "hint.rail.actions";
+        public static final String HINT_RAIL_HISTORY = "hint.rail.history";
+        public static final String HINT_RAIL_PROFILES = "hint.rail.profiles";
+        public static final String HINT_RAIL_AUDIT = "hint.rail.audit";
+        public static final String HINT_RAIL_SETTINGS = "hint.rail.settings";
+        public static final String HINT_TAB_GENERAL = "hint.tab.general";
+        public static final String HINT_TAB_INTERFACE = "hint.tab.interface";
+        public static final String HINT_TAB_CHAT = "hint.tab.chat";
+        public static final String HINT_TAB_SYSTEM = "hint.tab.system";
     }
 
     private static Language current = Language.RU;
@@ -422,6 +523,11 @@ public final class Lang {
         ru.put(Key.THEME_AURORA, "Аврора");
         ru.put(Key.THEME_NEON, "Неон");
         ru.put(Key.THEME_SUNSET, "Закат");
+        ru.put(Key.THEME_TWILIGHT, "Сумерки");
+        ru.put(Key.THEME_SAKURA, "Сакура");
+        ru.put(Key.THEME_GLACIER, "Ледник");
+        ru.put(Key.THEME_MINT, "Мята");
+        ru.put(Key.THEME_PLUM, "Слива");
 
         ru.put(Key.TOGGLE_CHAT_MENTIONS, "Упоминания в чате");
         ru.put(Key.TOGGLE_COPY_NAME, "Копировать имя");
@@ -440,9 +546,17 @@ public final class Lang {
         ru.put(Key.TOGGLE_MOD_HUD_PHRASES, "Фразы в HUD модератора");
         ru.put(Key.BTN_SETTINGS, "Настройки");
         ru.put(Key.THEME_NICK_COLOR, "Подсветка ника в чате");
+        ru.put(Key.LABEL_ACCENT_COLOR, "Акцентный цвет интерфейса");
         ru.put(Key.THEME_NICK_RESET, "сбросить");
         ru.put(Key.THEME_NICK_AUTO, "цвет темы");
-        ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимация рамок в меню");
+        ru.put(Key.TOGGLE_MENU_ANIMATION, "Анимации");
+        ru.put(Key.TITLE_ANIMATION_LABEL, "Анимация заголовка");
+        ru.put(Key.TITLE_ANIMATION_STATIC, "Без анимации");
+        ru.put(Key.TITLE_ANIMATION_AURORA, "Аврора");
+        ru.put(Key.TITLE_ANIMATION_PULSE, "Мягкий пульс");
+        ru.put(Key.TITLE_ANIMATION_SWEEP, "Световой импульс");
+        ru.put(Key.ANIMATION_SPEED, "Скорость анимаций");
+        ru.put(Key.GLOW_INTENSITY, "Сила свечения");
         ru.put(Key.TOGGLE_CHAT_RESIZE, "Изменение размера чата");
 
         ru.put(Key.TOGGLE_DETECT_PLAIN, "Ник в тексте сообщения");
@@ -450,6 +564,10 @@ public final class Lang {
         ru.put(Key.TOGGLE_DETECT_CLICK, "Клик-событие команды");
         ru.put(Key.TOGGLE_DETECT_HOVER, "Текст при наведении");
         ru.put(Key.TOGGLE_DETECT_ALIASES, "Выученные алиасы");
+        ru.put(
+                Key.TOGGLE_NICK_HIGHLIGHT_DISABLED,
+                "Не подсвечивать ники"
+        );
         ru.put(Key.TOGGLE_DETECT_UNICODE, "Юникод-замена (AV A)");
         ru.put(Key.TOGGLE_DETECT_DECOR, "Знаки вокруг ника");
         ru.put(Key.TOGGLE_DETECT_LINE, "Клик по нику в чате");
@@ -506,9 +624,6 @@ public final class Lang {
         ru.put(Key.PH_Z, "Ваша координата Z (блоки).\nПример: /tp <player> <x> <y> <z>");
         ru.put(Key.PH_PING, "Пинг цели в миллисекундах.\nПример: /warn <player> лаги (<ping> ms)");
         ru.put(Key.PH_SERVER, "Адрес текущего сервера.\nПолезно на сетях с лобби.");
-
-        ru.put(Key.HOVER_CLICK, "Клик: действия");
-        ru.put(Key.HOVER_SHIFT_CLICK, "Shift+клик: скопировать имя");
 
         ru.put(Key.HISTORY_TITLE, "История действий");
         ru.put(Key.HIST_COL_TIME, "Время");
@@ -576,6 +691,14 @@ public final class Lang {
         ru.put(Key.DETAIL_UNKNOWN, "неизвестно");
         ru.put(Key.DETAIL_NONE, "—");
 
+        // Manual punishment resolution
+        ru.put(Key.BTN_MARK_DONE, "Отметить выполненным");
+        ru.put(Key.BTN_MARK_FAILED, "Отметить отклонённым");
+        ru.put(Key.BTN_MARK_PENDING, "Вернуть в ожидание");
+        ru.put(Key.TOAST_MARKED_DONE, "Отмечено как выполненное");
+        ru.put(Key.TOAST_MARKED_FAILED, "Отмечено как отклонённое");
+        ru.put(Key.TOAST_MARKED_PENDING, "Возвращено в ожидание");
+
         ru.put(Key.BTN_PROFILE_CREATE, "Создать");
         ru.put(Key.BTN_PROFILE_SAVE, "Сохранить");
         ru.put(Key.BTN_PROFILE_APPLY, "Применить");
@@ -606,6 +729,73 @@ public final class Lang {
         ru.put(Key.TOAST_PROFILE_BAD_JSON, "Не удалось разобрать профиль");
         ru.put(Key.TOAST_PROFILE_LAST, "Нельзя удалить последний профиль");
         ru.put(Key.TOAST_THEME_CHANGED, "Тема: %s");
+
+        ru.put(Key.BTN_AUDIT, "Аудит");
+        ru.put(Key.TITLE_AUDIT, "Аудит и профилирование");
+        ru.put(Key.MSG_AUDIT_HINT,
+                "Всё, что делает мод: макросы, детект, наказания");
+        ru.put(Key.MSG_AUDIT_EMPTY, "Записей пока нет");
+        ru.put(Key.AUDIT_TAB_LOG, "Журнал");
+        ru.put(Key.AUDIT_TAB_PROFILE, "Профилировщик");
+        ru.put(Key.AUDIT_FILTER_ALL, "Все");
+        ru.put(Key.AUDIT_CLEAR, "Очистить");
+        ru.put(Key.AUDIT_CLEARED, "Журнал очищен");
+        ru.put(Key.AUDIT_CAT_MACRO, "Макросы");
+        ru.put(Key.AUDIT_CAT_DETECT, "Детект");
+        ru.put(Key.AUDIT_CAT_PUNISH, "Наказания");
+        ru.put(Key.AUDIT_CAT_CONFIG, "Настройки");
+        ru.put(Key.AUDIT_CAT_CHAT, "Чат");
+        ru.put(Key.AUDIT_CAT_ERROR, "Ошибки");
+        ru.put(Key.PROF_SECTION, "Секция");
+        ru.put(Key.PROF_CALLS, "Вызовы");
+        ru.put(Key.PROF_AVG, "Среднее");
+        ru.put(Key.PROF_MAX, "Пик");
+        ru.put(Key.PROF_TOTAL, "Всего");
+        ru.put(Key.PROF_TRACE, "Последние замеры");
+        ru.put(Key.PROF_RESET, "Сбросить");
+        ru.put(Key.PROF_EMPTY, "Замеров пока нет");
+        ru.put(Key.TOGGLE_AUDIT, "Аудит-лог");
+        ru.put(Key.TOGGLE_PROFILER, "Профилировщик");
+        ru.put(Key.PREVIEW_TITLE, "Предпросмотр команды");
+        ru.put(Key.PREVIEW_EXAMPLE, "Пример");
+        ru.put(Key.PREVIEW_EMPTY, "Введите команду");
+        ru.put(Key.HOVER_STATS_ONLINE, "В сети");
+        ru.put(Key.HOVER_STATS_OFFLINE, "Не в сети");
+        ru.put(Key.HOVER_STATS_PING, "Пинг");
+        ru.put(Key.HOVER_STATS_GAMEMODE, "Режим");
+        ru.put(Key.HOVER_STATS_PUNISH, "Наказаний");
+        ru.put(Key.HOVER_STATS_SERVER, "Сервер");
+        ru.put(Key.HOVER_STATS_OPEN, "Открыть действия");
+        ru.put(Key.MSG_DRAG_HINT, "Перетащите строку, чтобы изменить порядок");
+        ru.put(Key.MENU_SECTION_TOOLS, "Инструменты");
+        ru.put(Key.MENU_SECTION_SYSTEM, "Система");
+        ru.put(Key.MENU_STAT_MACROS, "Макросы");
+        ru.put(Key.MENU_STAT_ACTIONS, "Действия");
+        ru.put(Key.MENU_STAT_PUNISH, "Наказания");
+        ru.put(Key.MENU_STAT_SESSION, "Сессия");
+        ru.put(Key.MENU_PROFILE, "Профиль");
+
+        ru.put(Key.MSG_LANGUAGE_HINT,
+                "Выберите язык интерфейса мода");
+        ru.put(Key.MSG_ACCENT_HINT,
+                "Выберите акцентный цвет интерфейса");
+        ru.put(Key.MSG_INTERFACE_HINT,
+                "Внешний вид, уведомления и элементы интерфейса");
+        ru.put(Key.MSG_SYSTEM_HINT,
+                "Аудит, профилировщик и служебные инструменты");
+        ru.put(Key.MSG_EDITOR_HINT,
+                "Команда, плейсхолдеры и алиасы");
+
+        ru.put(Key.HINT_RAIL_MACROS, "Макросы: команды в один клик");
+        ru.put(Key.HINT_RAIL_ACTIONS, "Действия над игроком");
+        ru.put(Key.HINT_RAIL_HISTORY, "История наказаний");
+        ru.put(Key.HINT_RAIL_PROFILES, "Профили настроек");
+        ru.put(Key.HINT_RAIL_AUDIT, "Аудит и профилировщик");
+        ru.put(Key.HINT_RAIL_SETTINGS, "Настройки мода");
+        ru.put(Key.HINT_TAB_GENERAL, "Обзор: язык, цвет и быстрые переключатели");
+        ru.put(Key.HINT_TAB_INTERFACE, "Внешний вид и уведомления");
+        ru.put(Key.HINT_TAB_CHAT, "Детект ников и чат");
+        ru.put(Key.HINT_TAB_SYSTEM, "Аудит, профилировщик и переходы");
 
         Map<String, String> en = new HashMap<>();
         en.put(Key.APP_TITLE, "StaffTools");
@@ -655,6 +845,11 @@ public final class Lang {
         en.put(Key.THEME_AURORA, "Aurora");
         en.put(Key.THEME_NEON, "Neon");
         en.put(Key.THEME_SUNSET, "Sunset");
+        en.put(Key.THEME_TWILIGHT, "Twilight");
+        en.put(Key.THEME_SAKURA, "Sakura");
+        en.put(Key.THEME_GLACIER, "Glacier");
+        en.put(Key.THEME_MINT, "Mint");
+        en.put(Key.THEME_PLUM, "Plum");
 
         en.put(Key.TOGGLE_CHAT_MENTIONS, "Chat mentions");
         en.put(Key.TOGGLE_COPY_NAME, "Copy name");
@@ -673,9 +868,17 @@ public final class Lang {
         en.put(Key.TOGGLE_MOD_HUD_PHRASES, "Phrases in the moderator HUD");
         en.put(Key.BTN_SETTINGS, "Settings");
         en.put(Key.THEME_NICK_COLOR, "Nick highlight in chat");
+        en.put(Key.LABEL_ACCENT_COLOR, "Interface accent color");
         en.put(Key.THEME_NICK_RESET, "reset");
         en.put(Key.THEME_NICK_AUTO, "theme color");
-        en.put(Key.TOGGLE_MENU_ANIMATION, "Menu frame animation");
+        en.put(Key.TOGGLE_MENU_ANIMATION, "Animations");
+        en.put(Key.TITLE_ANIMATION_LABEL, "Brand animation");
+        en.put(Key.TITLE_ANIMATION_STATIC, "Static");
+        en.put(Key.TITLE_ANIMATION_AURORA, "Aurora");
+        en.put(Key.TITLE_ANIMATION_PULSE, "Soft pulse");
+        en.put(Key.TITLE_ANIMATION_SWEEP, "Light sweep");
+        en.put(Key.ANIMATION_SPEED, "Animation speed");
+        en.put(Key.GLOW_INTENSITY, "Glow strength");
         en.put(Key.TOGGLE_CHAT_RESIZE, "Chat resize handle");
 
         en.put(Key.TOGGLE_DETECT_PLAIN, "Nick in message text");
@@ -683,6 +886,10 @@ public final class Lang {
         en.put(Key.TOGGLE_DETECT_CLICK, "Command click event");
         en.put(Key.TOGGLE_DETECT_HOVER, "Hover tooltip text");
         en.put(Key.TOGGLE_DETECT_ALIASES, "Learned aliases");
+        en.put(
+                Key.TOGGLE_NICK_HIGHLIGHT_DISABLED,
+                "Don't highlight nicknames"
+        );
         en.put(Key.TOGGLE_DETECT_UNICODE, "Unicode lookup (AV A)");
         en.put(Key.TOGGLE_DETECT_DECOR, "Signs around the nick");
         en.put(Key.TOGGLE_DETECT_LINE, "Click a nick in chat");
@@ -739,9 +946,6 @@ public final class Lang {
         en.put(Key.PH_Z, "Your Z coordinate (blocks).\nExample: /tp <player> <x> <y> <z>");
         en.put(Key.PH_PING, "Target latency in ms (live).\nExample: /warn <player> lagging (<ping> ms)");
         en.put(Key.PH_SERVER, "Current server address.\nUseful on BungeeCord-style networks.");
-
-        en.put(Key.HOVER_CLICK, "Click: actions");
-        en.put(Key.HOVER_SHIFT_CLICK, "Shift-click: copy name");
 
         en.put(Key.HISTORY_TITLE, "Action History");
         en.put(Key.HIST_COL_TIME, "Time");
@@ -808,6 +1012,14 @@ public final class Lang {
         en.put(Key.DETAIL_UNKNOWN, "unknown");
         en.put(Key.DETAIL_NONE, "—");
 
+        // Manual punishment resolution
+        en.put(Key.BTN_MARK_DONE, "Mark as done");
+        en.put(Key.BTN_MARK_FAILED, "Mark as failed");
+        en.put(Key.BTN_MARK_PENDING, "Mark as pending");
+        en.put(Key.TOAST_MARKED_DONE, "Marked as done");
+        en.put(Key.TOAST_MARKED_FAILED, "Marked as failed");
+        en.put(Key.TOAST_MARKED_PENDING, "Marked as pending");
+
         en.put(Key.BTN_PROFILE_CREATE, "Create");
         en.put(Key.BTN_PROFILE_SAVE, "Save");
         en.put(Key.BTN_PROFILE_APPLY, "Apply");
@@ -839,6 +1051,73 @@ public final class Lang {
         en.put(Key.TOAST_PROFILE_LAST, "Cannot delete the last profile");
         en.put(Key.TOAST_THEME_CHANGED, "Theme: %s");
 
+        en.put(Key.BTN_AUDIT, "Audit");
+        en.put(Key.TITLE_AUDIT, "Audit & Profiling");
+        en.put(Key.MSG_AUDIT_HINT,
+                "Everything the mod does: macros, detection, punishments");
+        en.put(Key.MSG_AUDIT_EMPTY, "No entries yet");
+        en.put(Key.AUDIT_TAB_LOG, "Journal");
+        en.put(Key.AUDIT_TAB_PROFILE, "Profiler");
+        en.put(Key.AUDIT_FILTER_ALL, "All");
+        en.put(Key.AUDIT_CLEAR, "Clear");
+        en.put(Key.AUDIT_CLEARED, "Journal cleared");
+        en.put(Key.AUDIT_CAT_MACRO, "Macros");
+        en.put(Key.AUDIT_CAT_DETECT, "Detection");
+        en.put(Key.AUDIT_CAT_PUNISH, "Punishments");
+        en.put(Key.AUDIT_CAT_CONFIG, "Settings");
+        en.put(Key.AUDIT_CAT_CHAT, "Chat");
+        en.put(Key.AUDIT_CAT_ERROR, "Errors");
+        en.put(Key.PROF_SECTION, "Section");
+        en.put(Key.PROF_CALLS, "Calls");
+        en.put(Key.PROF_AVG, "Avg");
+        en.put(Key.PROF_MAX, "Peak");
+        en.put(Key.PROF_TOTAL, "Total");
+        en.put(Key.PROF_TRACE, "Recent samples");
+        en.put(Key.PROF_RESET, "Reset");
+        en.put(Key.PROF_EMPTY, "No samples yet");
+        en.put(Key.TOGGLE_AUDIT, "Audit log");
+        en.put(Key.TOGGLE_PROFILER, "Profiler");
+        en.put(Key.PREVIEW_TITLE, "Command preview");
+        en.put(Key.PREVIEW_EXAMPLE, "Example");
+        en.put(Key.PREVIEW_EMPTY, "Type a command");
+        en.put(Key.HOVER_STATS_ONLINE, "Online");
+        en.put(Key.HOVER_STATS_OFFLINE, "Offline");
+        en.put(Key.HOVER_STATS_PING, "Ping");
+        en.put(Key.HOVER_STATS_GAMEMODE, "Mode");
+        en.put(Key.HOVER_STATS_PUNISH, "Punishments");
+        en.put(Key.HOVER_STATS_SERVER, "Server");
+        en.put(Key.HOVER_STATS_OPEN, "Open actions");
+        en.put(Key.MSG_DRAG_HINT, "Drag a row to reorder");
+        en.put(Key.MENU_SECTION_TOOLS, "Tools");
+        en.put(Key.MENU_SECTION_SYSTEM, "System");
+        en.put(Key.MENU_STAT_MACROS, "Macros");
+        en.put(Key.MENU_STAT_ACTIONS, "Actions");
+        en.put(Key.MENU_STAT_PUNISH, "Punishments");
+        en.put(Key.MENU_STAT_SESSION, "Session");
+        en.put(Key.MENU_PROFILE, "Profile");
+
+        en.put(Key.MSG_LANGUAGE_HINT,
+                "Choose the display language for the mod");
+        en.put(Key.MSG_ACCENT_HINT,
+                "Choose your preferred accent color");
+        en.put(Key.MSG_INTERFACE_HINT,
+                "Appearance, notifications and interface elements");
+        en.put(Key.MSG_SYSTEM_HINT,
+                "Audit, profiler and service tools");
+        en.put(Key.MSG_EDITOR_HINT,
+                "Command, placeholders and aliases");
+
+        en.put(Key.HINT_RAIL_MACROS, "Macros: one-click commands");
+        en.put(Key.HINT_RAIL_ACTIONS, "Actions on a player");
+        en.put(Key.HINT_RAIL_HISTORY, "Punishment history");
+        en.put(Key.HINT_RAIL_PROFILES, "Settings profiles");
+        en.put(Key.HINT_RAIL_AUDIT, "Audit log and profiler");
+        en.put(Key.HINT_RAIL_SETTINGS, "Mod settings");
+        en.put(Key.HINT_TAB_GENERAL, "Overview: language, colour and quick switches");
+        en.put(Key.HINT_TAB_INTERFACE, "Appearance and notifications");
+        en.put(Key.HINT_TAB_CHAT, "Nick detection and chat");
+        en.put(Key.HINT_TAB_SYSTEM, "Audit, profiler and navigation");
+
         TEXTS.put(Language.RU, ru);
         TEXTS.put(Language.EN, en);
     }
@@ -855,7 +1134,20 @@ public final class Lang {
 
     public static String t(String key) {
         String value = TEXTS.get(current).get(key);
-        return value != null ? value : key;
+        if (value != null) {
+            return value;
+        }
+
+        // Fallback to English if current language is not English
+        if (current != Language.EN) {
+            String fallback = TEXTS.get(Language.EN).get(key);
+            if (fallback != null) {
+                return fallback;
+            }
+        }
+
+        // Last resort: return the key itself
+        return key;
     }
 
     public static String t(String key, Object... args) {

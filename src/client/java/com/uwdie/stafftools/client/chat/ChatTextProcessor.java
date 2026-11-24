@@ -1,7 +1,7 @@
 package com.uwdie.stafftools.client.chat;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
-import com.uwdie.stafftools.client.i18n.Lang;
+import com.uwdie.stafftools.client.audit.Profiler;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
 import net.minecraft.text.ClickEvent;
@@ -13,7 +13,6 @@ import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.text.TextContent;
 import net.minecraft.text.TranslatableTextContent;
-import net.minecraft.util.Formatting;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -48,6 +47,20 @@ public final class ChatTextProcessor {
         if (message == null) {
             return null;
         }
+
+        long startedAt = System.nanoTime();
+
+        try {
+            return processInternal(message);
+        } finally {
+            Profiler.get().record(
+                    Profiler.CHAT_PROCESS,
+                    System.nanoTime() - startedAt
+            );
+        }
+    }
+
+    private static Text processInternal(Text message) {
 
         // every incoming message is a chance to learn a nick: the tab
         // list may be empty while the chat still mentions the player
@@ -85,6 +98,20 @@ public final class ChatTextProcessor {
             return null;
         }
 
+        long startedAt = System.nanoTime();
+
+        try {
+            return processWholeMessageInternal(message);
+        } finally {
+            Profiler.get().record(
+                    Profiler.CHAT_WHOLE,
+                    System.nanoTime() - startedAt
+            );
+        }
+    }
+
+    private static Text processWholeMessageInternal(Text message) {
+
         FlatLine flat = flatten(message);
 
         if (flat.text().isBlank()) {
@@ -92,7 +119,7 @@ public final class ChatTextProcessor {
         }
 
         List<PlayerMention> mentions =
-                PlayerMentionDetector.detect(flat.text());
+                PlayerMentionDetector.detectAndAudit(flat.text());
 
         if (mentions.isEmpty()) {
             return message;
@@ -265,8 +292,17 @@ public final class ChatTextProcessor {
                 ? null
                 : mention.player();
 
-        boolean highlight =
-                mention != null && mention.highlight();
+        String visibleText = null;
+
+        if (mention != null &&
+                from <= to &&
+                to <= flat.text().length()) {
+
+            visibleText = flat.text().substring(from, to);
+        }
+
+        boolean highlight = mention != null &&
+                shouldHighlight(mention);
 
         int[] codePoints =
                 flat.text().codePoints()
@@ -286,12 +322,8 @@ public final class ChatTextProcessor {
                     ? at
                     : mentionStyle(
                             at,
-                            new PlayerMention(
-                                    player,
-                                    0,
-                                    0,
-                                    highlight
-                            )
+                            mention,
+                            highlight
                     );
 
             if (current == null ||
@@ -390,14 +422,6 @@ public final class ChatTextProcessor {
             return mentions.get(0).player();
         }
 
-        // 4. typo-tolerant, only when explicitly enabled
-        if (config.isDetectFuzzy()) {
-
-            return NickCache.get()
-                    .resolveFuzzy(word)
-                    .orElse(null);
-        }
-
         return null;
     }
 
@@ -487,6 +511,44 @@ public final class ChatTextProcessor {
         return null;
     }
 
+    /** Returns true only for a short name-like chat component. */
+    private static boolean isLikelyNameComponent(String text) {
+
+        if (text == null) {
+            return false;
+        }
+
+        String trimmed = text.trim();
+
+        if (trimmed.isEmpty() ||
+                trimmed.length() > 24 ||
+                trimmed.indexOf(' ') >= 0 ||
+                trimmed.indexOf('\n') >= 0 ||
+                trimmed.indexOf('\r') >= 0 ||
+                trimmed.indexOf('\t') >= 0) {
+
+            return false;
+        }
+
+        int nameChars = 0;
+
+        for (int i = 0; i < trimmed.length(); i++) {
+
+            char c = trimmed.charAt(i);
+
+            if (c == '\u00A7' && i + 1 < trimmed.length()) {
+                i++;
+                continue;
+            }
+
+            if (TextNormalizer.isNameChar(c)) {
+                nameChars++;
+            }
+        }
+
+        return nameChars >= 2;
+    }
+
     private static Text processNode(
             Text node,
             Style inherited
@@ -514,6 +576,14 @@ public final class ChatTextProcessor {
 
             NickCache.get().remember(eventPlayer.player());
 
+            if (isLikelyNameComponent(node.getString())) {
+                EssentialsNickTracker.get()
+                        .learnFromDisplayName(
+                                node.getString(),
+                                eventPlayer.player()
+                        );
+            }
+
             NickAliases.learn(
                     node.getString(),
                     eventPlayer.player()
@@ -526,7 +596,8 @@ public final class ChatTextProcessor {
                             0,
                             0,
                             eventPlayer.highlight()
-                    )
+                    ),
+                    node.getString()
             );
 
             // A node can hold more than one nick. When the event only
@@ -611,6 +682,14 @@ public final class ChatTextProcessor {
 
                 NickCache.get().remember(byDisplayName);
 
+                    if (isLikelyNameComponent(string)) {
+                        EssentialsNickTracker.get()
+                                .learnFromDisplayName(
+                                        string,
+                                        byDisplayName
+                                );
+                    }
+
                 NickAliases.learn(string, byDisplayName);
 
                 return withProcessedSiblings(
@@ -622,7 +701,8 @@ public final class ChatTextProcessor {
                                                 byDisplayName,
                                                 0,
                                                 0
-                                        )
+                                        ),
+                                        node.getString()
                                 )
                         ),
                         node,
@@ -1076,7 +1156,13 @@ public final class ChatTextProcessor {
             PlayerMention mention
     ) {
         return Text.literal(name)
-                .setStyle(mentionStyle(baseStyle, mention));
+                .setStyle(
+                        mentionStyle(
+                                baseStyle,
+                                mention,
+                                name
+                        )
+                );
     }
 
     /**
@@ -1084,13 +1170,39 @@ public final class ChatTextProcessor {
      *
      * A mention found through the real account name is repainted in
      * the mod's colour, so it stands out in a wall of text. A mention
-     * that is only known through a changed /nick keeps the colour the
-     * server sent, because that word belongs to somebody's message.
-     * Both are clickable either way.
+     * follows the global "no nick highlighting" setting.
+     * Every recognized name stays clickable either way.
      */
     private static Style mentionStyle(
             Style baseStyle,
+            PlayerMention mention,
+            String visibleText
+    ) {
+
+        return mentionStyle(
+                baseStyle,
+                mention,
+                shouldHighlight(mention)
+        );
+    }
+
+    private static boolean shouldHighlight(
             PlayerMention mention
+    ) {
+
+        if (StafftoolsClient.getConfig()
+                .isNickHighlightDisabled()) {
+
+            return false;
+        }
+
+        return mention.highlight();
+    }
+
+    private static Style mentionStyle(
+            Style baseStyle,
+            PlayerMention mention,
+            boolean highlight
     ) {
 
         PlayerContext player = mention.player();
@@ -1105,29 +1217,9 @@ public final class ChatTextProcessor {
                 .withClickEvent(
                         new ClickEvent.RunCommand(value)
                 )
-                .withHoverEvent(
-                        new HoverEvent.ShowText(
-                                Text.literal(player.name())
-                                        .append("\n")
-                                        .append(
-                                                Text.literal(Lang.t("hover.click"))
-                                                        .setStyle(
-                                                                Style.EMPTY
-                                                                        .withColor(Formatting.GOLD)
-                                                        )
-                                        )
-                                        .append("\n")
-                                        .append(
-                                                Text.literal(Lang.t("hover.shiftClick"))
-                                                        .setStyle(
-                                                                Style.EMPTY
-                                                                        .withColor(Formatting.GRAY)
-                                                        )
-                                        )
-                        )
-                );
+                .withHoverEvent(null);
 
-        return mention.highlight()
+        return highlight
                 ? styled.withColor(nickColor())
                 : styled;
     }

@@ -7,7 +7,6 @@ import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.ui.widget.StButton;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -20,37 +19,20 @@ import java.util.Optional;
 
 /**
  * Profile manager: create / save / apply / export / import / delete
- * staff setups. Rows follow the same visual language as the other
- * lists (framed panel, entrance stagger, spring scrolling).
+ * staff setups. Rows are cards with the profile name, a summary line and
+ * its own buttons; the active profile is marked with an accent edge.
  */
-public class ProfilesScreen extends StScreen {
+public class ProfilesScreen extends StListScreen {
 
     private static final int ROW_H = 38;
     private static final int ROW_GAP = 4;
     private static final int LIST_TOP = 46;
     private static final int BOTTOM_PAD = 44;
     private static final int BTN_H = 18;
-    private static final int FADE_H = 12;
-
-    /** Rows live inside the frame, never flush with its border. */
-    private static final int ROW_PAD = 9;
-
-    private static final float SCROLL_STIFF = 240f;
-    private static final float SCROLL_DAMP = 19f;
-    private static final float SCROLL_RUBBER = 14f;
-    private static final float EDGE_STIFF = 420f;
-    private static final float EDGE_DAMP = 30f;
 
     private final Screen parent;
 
-    private float scroll;
-    private float scrollPos;
-    private float scrollVel;
     private boolean needsRebuild;
-
-    private int listBottom;
-    private int rowLeft;
-    private int rowWidth;
 
     private final List<Row> rows = new ArrayList<>();
 
@@ -64,15 +46,13 @@ public class ProfilesScreen extends StScreen {
 
         private final Profile profile;
         private final boolean active;
-        private final int baseY;
         private StButton btnOpen;
         private StButton btnExport;
         private StButton btnDelete;
 
-        private Row(Profile profile, boolean active, int baseY) {
+        private Row(Profile profile, boolean active) {
             this.profile = profile;
             this.active = active;
-            this.baseY = baseY;
         }
     }
 
@@ -93,34 +73,30 @@ public class ProfilesScreen extends StScreen {
         rows.clear();
         clearChildren();
 
+        configureShell();
+
         StaffToolsConfig config = StafftoolsClient.getConfig();
 
         String activeId = config.getActiveProfile().getId();
 
-        rowWidth = Math.min(300, formWidth());
-        rowLeft = (width - rowWidth) / 2;
+        rowWidth = Math.min(440, contentWidth());
+        rowLeft = contentLeft();
 
-        listBottom = height - BOTTOM_PAD;
+        listTop = contentTop() + 40;
+        listBottom = contentBottom() - 40;
 
-        int step = ROW_H + ROW_GAP;
-
-        for (int i = 0; i < config.getProfiles().size(); i++) {
-
-            Profile profile = config.getProfiles().get(i);
+        for (Profile profile : config.getProfiles()) {
 
             Row row = new Row(
                     profile,
-                    profile.getId().equals(activeId),
-                    LIST_TOP + i * step
+                    profile.getId().equals(activeId)
             );
 
             rows.add(row);
             addRowButtons(row);
         }
 
-        scroll = Math.min(scroll, maxScroll());
-        scrollPos = scroll;
-        scrollVel = 0f;
+        resetScroll();
 
         int gap = 6;
         int avail = rowWidth - gap * 2;
@@ -131,18 +107,18 @@ public class ProfilesScreen extends StScreen {
 
         button(
                 rowLeft,
-                height - 32,
+                contentBottom() - 26,
                 w1,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_PROFILE_CREATE,
                 b -> create()
         );
 
         button(
                 rowLeft + w1 + gap,
-                height - 32,
+                contentBottom() - 26,
                 w2,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_PROFILE_IMPORT,
                 b -> client.setScreen(
                         new ProfileImportScreen(this)
@@ -151,39 +127,36 @@ public class ProfilesScreen extends StScreen {
 
         button(
                 rowLeft + w1 + w2 + gap * 2,
-                height - 32,
+                contentBottom() - 26,
                 w3,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_BACK,
                 b -> client.setScreen(new StafftoolsScreen())
         );
     }
 
-    private int maxScroll() {
+    @Override
+    protected int rowCount() {
+        return rows.size();
+    }
 
-        if (rows.isEmpty()) {
-            return 0;
-        }
+    @Override
+    protected int rowStep() {
+        return ROW_H + ROW_GAP;
+    }
 
-        int content =
-                rows.size() * ROW_H +
-                        (rows.size() - 1) * ROW_GAP;
-
-        return Math.max(
-                0,
-                content - (listBottom - LIST_TOP)
-        );
+    @Override
+    protected int rowHeight() {
+        return ROW_H;
     }
 
     private void addRowButtons(Row row) {
-
-        int y = row.baseY + (ROW_H - BTN_H) / 2;
 
         int right = rowLeft + rowWidth - ROW_PAD - 5;
 
         row.btnDelete = button(
                 right - 40,
-                y,
+                0,
                 40,
                 BTN_H,
                 Key.BTN_PROFILE_DELETE,
@@ -193,7 +166,7 @@ public class ProfilesScreen extends StScreen {
 
         row.btnExport = button(
                 right - 40 - 3 - 46,
-                y,
+                0,
                 46,
                 BTN_H,
                 Key.BTN_PROFILE_EXPORT,
@@ -202,7 +175,7 @@ public class ProfilesScreen extends StScreen {
 
         row.btnOpen = button(
                 right - 40 - 3 - 46 - 3 - 46,
-                y,
+                0,
                 46,
                 BTN_H,
                 Key.BTN_PROFILE_OPEN,
@@ -228,16 +201,14 @@ public class ProfilesScreen extends StScreen {
             boolean doubled
     ) {
 
-        double mouseX = click.x();
-        double mouseY = click.y();
-        int button = click.button();
+        if (click.button() == 0) {
 
-        if (button == 0) {
-
-            Row row = rowAt(mouseX, mouseY);
+            Row row = rowAt(click.x(), click.y());
 
             // a click on the row itself applies the profile right away
-            if (row != null && !overRowButtons(row, mouseX, mouseY)) {
+            if (row != null &&
+                    !overRowButtons(row, click.x(), click.y())) {
+
                 apply(row.profile);
                 return true;
             }
@@ -249,34 +220,25 @@ public class ProfilesScreen extends StScreen {
     /** Row under the cursor, or null. */
     private Row rowAt(double mouseX, double mouseY) {
 
-        if (mouseX < rowLeft + ROW_PAD ||
-                mouseX > rowLeft + rowWidth - ROW_PAD) {
-
+        if (!insideList(mouseX, mouseY)) {
             return null;
         }
 
-        if (mouseY < LIST_TOP || mouseY >= listBottom) {
-            return null;
-        }
+        int index = rowIndexAt(mouseY);
 
-        int step = ROW_H + ROW_GAP;
-
-        int index = (int) ((mouseY - LIST_TOP + scrollPos) / step);
-
-        if (index < 0 || index >= rows.size()) {
-            return null;
-        }
-
-        return rows.get(index);
+        return index >= 0 ? rows.get(index) : null;
     }
 
     /** True when the cursor sits on one of the row's own buttons. */
-    private boolean overRowButtons(Row row, double mouseX, double mouseY) {
+    private boolean overRowButtons(
+            Row row,
+            double mouseX,
+            double mouseY
+    ) {
 
         int index = rows.indexOf(row);
 
-        int top = LIST_TOP + index * (ROW_H + ROW_GAP)
-                - Math.round(scrollPos);
+        int top = rowY(index);
 
         int buttonY = top + (ROW_H - BTN_H) / 2;
 
@@ -286,8 +248,6 @@ public class ProfilesScreen extends StScreen {
 
         int right = rowLeft + rowWidth - ROW_PAD - 5;
 
-        int deleteX = right - 40;
-        int exportX = right - 40 - 3 - 46;
         int openX = right - 40 - 3 - 46 - 3 - 46;
 
         return mouseX >= openX && mouseX <= right;
@@ -381,62 +341,9 @@ public class ProfilesScreen extends StScreen {
         needsRebuild = true;
     }
 
-    @Override
-    public boolean mouseScrolled(
-            double mouseX,
-            double mouseY,
-            double horizontalAmount,
-            double verticalAmount
-    ) {
-
-        float step = ROW_H + ROW_GAP;
-
-        scroll += verticalAmount > 0 ? -step : step;
-
-        return true;
-    }
-
-    private void updateScroll(float delta) {
-
-        float step = Ui.clamp01(delta) * 0.05f;
-        float max = maxScroll();
-
-        float target = Math.clamp(
-                scroll,
-                -SCROLL_RUBBER,
-                max + SCROLL_RUBBER
-        );
-
-        for (int i = 0; i < 3; i++) {
-
-            float s = step / 3f;
-
-            float accel =
-                    (target - scrollPos) * SCROLL_STIFF
-                            - scrollVel * SCROLL_DAMP;
-
-            float over = scrollPos < 0f
-                    ? scrollPos
-                    : scrollPos > max
-                    ? scrollPos - max
-                    : 0f;
-
-            if (over != 0f) {
-                accel -= over * EDGE_STIFF;
-                accel -= scrollVel * EDGE_DAMP;
-            }
-
-            scrollVel += accel * s;
-            scrollPos += scrollVel * s;
-        }
-
-        if (Math.abs(scrollPos - target) < 0.05f &&
-                Math.abs(scrollVel) < 0.05f) {
-
-            scrollPos = target;
-            scrollVel = 0f;
-        }
-    }
+    // ------------------------------------------------------------------
+    // rendering
+    // ------------------------------------------------------------------
 
     @Override
     protected void renderTheme(
@@ -447,62 +354,47 @@ public class ProfilesScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.TITLE_PROFILES, alpha);
-
-        drawHint(context, Key.MSG_PROFILES_HINT, 30, alpha);
-
-        Ui.drawPanel(
+        Ui.drawSectionTitle(
                 context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDC64",
+                Lang.t(Key.TITLE_PROFILES),
+                Lang.t(Key.MSG_PROFILES_HINT),
                 alpha
         );
-        Ui.drawOrbitFrame(
-                context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
-                alpha
-        );
+
+        renderList(context, mouseX, mouseY, delta, alpha);
 
         if (rows.isEmpty()) {
 
             context.drawCenteredTextWithShadow(
                     textRenderer,
                     Lang.text(Key.MSG_PROFILES_EMPTY),
-                    width / 2,
-                    LIST_TOP + 26,
+                    rowLeft + rowWidth / 2,
+                    listTop + 26,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
             );
-
-            return;
         }
+    }
 
-        long now = System.currentTimeMillis();
-
-        updateScroll(delta);
-
-        int shift = (int) ((1f - alpha) * 14f);
-
-        context.enableScissor(
-                rowLeft + ROW_PAD,
-                LIST_TOP,
-                rowLeft + rowWidth - ROW_PAD,
-                listBottom
-        );
+    @Override
+    protected void renderRows(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float delta,
+            float alpha
+    ) {
 
         for (int i = 0; i < rows.size(); i++) {
 
             Row row = rows.get(i);
 
-            int y = LIST_TOP + i * (ROW_H + ROW_GAP)
-                    - Math.round(scrollPos);
+            int y = rowY(i);
 
-            boolean drawable =
-                    y + ROW_H > LIST_TOP && y < listBottom;
+            boolean drawable = rowVisible(i);
 
             int buttonY = y + (ROW_H - BTN_H) / 2;
 
@@ -510,7 +402,7 @@ public class ProfilesScreen extends StScreen {
                     row,
                     buttonY,
                     drawable &&
-                            buttonY >= LIST_TOP &&
+                            buttonY >= listTop &&
                             buttonY + BTN_H <= listBottom
             );
 
@@ -518,20 +410,21 @@ public class ProfilesScreen extends StScreen {
                 continue;
             }
 
-            float rowAlpha = Ui.clamp01(
-                    (now - openTime - i * 22L) / 180f
-            );
+            float rowAlpha = rowAlpha(i);
 
             if (rowAlpha <= 0.01f) {
                 continue;
             }
 
-            drawRow(context, row, y, mouseX, mouseY, alpha * rowAlpha);
+            drawRow(
+                    context,
+                    row,
+                    y,
+                    mouseX,
+                    mouseY,
+                    alpha * rowAlpha
+            );
         }
-
-        context.disableScissor();
-
-        drawScrollMasks(context, alpha);
     }
 
     private void drawRow(
@@ -545,53 +438,49 @@ public class ProfilesScreen extends StScreen {
 
         Profile profile = row.profile;
 
+        int rx = rowLeft + ROW_PAD;
+        int rw = rowWidth - ROW_PAD * 2;
+        int rh = ROW_H - 2;
+
         boolean hovered =
-                mouseX >= rowLeft + ROW_PAD &&
-                        mouseX <= rowLeft + rowWidth - ROW_PAD &&
-                        mouseY >= y &&
-                        mouseY <= y + ROW_H - 2;
+                mouseX >= rx && mouseX <= rx + rw &&
+                        mouseY >= y && mouseY <= y + rh;
 
-        int bg = hovered
-                ? Ui.argb(0x403F8AE0, alpha)
-                : Ui.argb(Ui.PANEL_BG_SOFT, alpha * 0.85f);
+        if (row.active) {
 
-        Ui.drawRoundRect(
-                context,
-                rowLeft + ROW_PAD,
-                y,
-                rowWidth - ROW_PAD * 2,
-                ROW_H - 2,
-                3,
-                bg
+            Ui.drawCardAccent(
+                    context, rx, y, rw, rh,
+                    Ui.ACCENT, alpha
+            );
+
+        } else if (hovered) {
+
+            Ui.drawRoundRect(
+                    context, rx, y, rw, rh, Design.RADIUS_MD,
+                    Ui.argb(Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.16f), alpha)
+            );
+
+            Ui.drawRoundBorder(
+                    context, rx, y, rw, rh, Design.RADIUS_MD,
+                    Ui.argb(Ui.ACCENT, alpha * 0.9f)
+            );
+
+        } else {
+
+            Ui.drawCard(context, rx, y, rw, rh, alpha);
+        }
+
+        int textW = Math.max(50, rw - 160);
+
+        String name = textRenderer.trimToWidth(
+                profile.getName(),
+                textW
         );
-
-        Ui.drawRoundBorder(
-                context,
-                rowLeft + ROW_PAD,
-                y,
-                rowWidth - ROW_PAD * 2,
-                ROW_H - 2,
-                3,
-                Ui.argb(
-                        hovered
-                                ? Ui.ACCENT
-                                : row.active
-                                ? Ui.ACCENT_DARK
-                                : 0xFF2C3B55,
-                        alpha * (hovered || row.active ? 1f : 0.55f)
-                )
-        );
-
-        String name =
-                textRenderer.trimToWidth(
-                        profile.getName(),
-                        rowWidth - ROW_PAD * 2 - 156
-                );
 
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(name),
-                rowLeft + ROW_PAD + 10,
+                rx + 10,
                 y + 5,
                 Ui.argb(
                         row.active ? Ui.ACCENT_SOFT : Ui.TEXT,
@@ -611,63 +500,25 @@ public class ProfilesScreen extends StScreen {
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
-                        textRenderer.trimToWidth(
-                                details,
-                                rowWidth - ROW_PAD * 2 - 156
-                        )
+                        textRenderer.trimToWidth(details, textW)
                 ),
-                rowLeft + ROW_PAD + 10,
+                rx + 10,
                 y + 17,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
         );
 
         if (row.active) {
 
-            context.drawTextWithShadow(
+            String badge = Lang.t(Key.MSG_PROFILE_ACTIVE);
+
+            Ui.drawPill(
+                    context,
                     textRenderer,
-                    Text.literal(Lang.t(Key.MSG_PROFILE_ACTIVE)),
-                    rowLeft + rowWidth - ROW_PAD - 5 -
-                            textRenderer.getWidth(
-                                    Lang.t(Key.MSG_PROFILE_ACTIVE)
-                            ),
+                    rx + rw - 160 - Ui.pillWidth(textRenderer, badge) - 6,
                     y + 5,
-                    Ui.argb(Ui.SUCCESS, alpha)
-            );
-        }
-    }
-
-    private void drawScrollMasks(
-            DrawContext context,
-            float alpha
-    ) {
-
-        float top = Ui.clamp01(scrollPos / FADE_H);
-
-        float bottom = Ui.clamp01(
-                (maxScroll() - scrollPos) / FADE_H
-        );
-
-        if (top > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    LIST_TOP,
-                    rowLeft + rowWidth - ROW_PAD,
-                    LIST_TOP + FADE_H,
-                    Ui.argb(Ui.PANEL_BG, alpha * top),
-                    Ui.argb(Ui.PANEL_BG, 0f)
-            );
-        }
-
-        if (bottom > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    listBottom - FADE_H,
-                    rowLeft + rowWidth - ROW_PAD,
-                    listBottom,
-                    Ui.argb(Ui.PANEL_BG, 0f),
-                    Ui.argb(Ui.PANEL_BG, alpha * bottom)
+                    badge,
+                    Ui.SUCCESS,
+                    alpha
             );
         }
     }

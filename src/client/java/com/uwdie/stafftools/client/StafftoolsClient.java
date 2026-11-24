@@ -35,6 +35,20 @@ public class StafftoolsClient implements ClientModInitializer {
                 configManager.getConfig().getLanguage()
         );
 
+        com.uwdie.stafftools.client.audit.AuditLog.get()
+                .info(
+                        com.uwdie.stafftools.client.audit
+                                .AuditCategory.CONFIG,
+                        "StaffTools started (v"
+                                + FabricLoader.getInstance()
+                                .getModContainer("stafftools")
+                                .map(m -> m.getMetadata()
+                                        .getVersion()
+                                        .getFriendlyString())
+                                .orElse("?")
+                                + ")"
+                );
+
         com.uwdie.stafftools.client.ui.Theme.apply(
                 configManager.getConfig().getThemeIndex()
         );

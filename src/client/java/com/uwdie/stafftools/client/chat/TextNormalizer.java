@@ -58,10 +58,10 @@ public final class TextNormalizer {
 
             // small caps ("q", "s", "x" are already plain ASCII there)
             {
-                    "\u1D00\u0299\u1D04\u1D05\u1D07\uAB30\u0262\u029C\u026A"
+                    "\u1D00\u0299\u1D04\u1D05\u1D07\uA730\u0262\u029C\u026A"
                             + "\u1D0A\u1D0B\u029F\u1D0D\u0274\u1D0F\u1D18\u0280"
                             + "\u1D1B\u1D1C\u1D20\u1D21\u028F\u1D22",
-                    "abcdefghijklmnoprstuvwyz"
+                    "abcdefghijklmnoprtuvwyz"
             },
 
             // superscript / subscript digits

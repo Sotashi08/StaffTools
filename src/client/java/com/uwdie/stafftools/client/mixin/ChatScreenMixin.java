@@ -3,6 +3,7 @@ package com.uwdie.stafftools.client.mixin;
 import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.chat.ChatLinePicker;
 import com.uwdie.stafftools.client.chat.ChatTextProcessor;
+import com.uwdie.stafftools.client.chat.NickStats;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.player.PlayerContext;
@@ -53,6 +54,15 @@ public class ChatScreenMixin {
         // actions popup floats on top of it
         ChatResizer.INSTANCE.renderFrame(context, mouseX, mouseY);
 
+        // styled player-card tooltip; vanilla's text tooltip is removed
+        // from the detected nick style so this card can match StaffTools
+        NickStats.renderHoverCard(
+                context,
+                mouseX,
+                mouseY,
+                delta
+        );
+
         PlayerActionOverlay.INSTANCE.render(
                 context,
                 mouseX,
@@ -66,7 +76,7 @@ public class ChatScreenMixin {
         // when the popup happens to cover the corner
         ChatResizer.INSTANCE.renderGrip(context, mouseX, mouseY);
 
-        // moderator panel: own layer, fades in with the chat
+        // moderator panel: own layer, with a rotating open/close effect
         ModeratorHud.INSTANCE.render(context, mouseX, mouseY);
     }
 
@@ -200,12 +210,26 @@ public class ChatScreenMixin {
             client.keyboard.setClipboard(
                     player.name()
             );
+
+            com.uwdie.stafftools.client.audit.AuditLog.get()
+                    .info(
+                            com.uwdie.stafftools.client.audit
+                                    .AuditCategory.CHAT,
+                            "Copied nick: " + player.name()
+                    );
         }
 
         if (StafftoolsClient.getConfig()
                 .isPlayerActionsEnabled()) {
 
             PlayerActionOverlay.INSTANCE.open(player);
+
+            com.uwdie.stafftools.client.audit.AuditLog.get()
+                    .info(
+                            com.uwdie.stafftools.client.audit
+                                    .AuditCategory.CHAT,
+                            "Opened actions for " + player.name()
+                    );
         }
 
         cir.setReturnValue(true);
@@ -241,6 +265,17 @@ public class ChatScreenMixin {
 
         double mouseX = click.x();
         double mouseY = click.y();
+
+        // toasts float above the chat: a click on one expands it
+        if (Toasts.INSTANCE.mouseClicked(
+                mouseX,
+                mouseY,
+                click.button()
+        )) {
+
+            cir.setReturnValue(true);
+            return;
+        }
 
         // Alt + click on a chat line copies its full text to the clipboard
         if (click.button() == 0 &&

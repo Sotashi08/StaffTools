@@ -844,11 +844,10 @@ public final class ChatResizer {
     // ------------------------------------------------------------------
 
     /**
-     * Draws the animated chat frame: a resting hairline, the orbit bars
-     * that the menus use (in their light preset — the chat perimeter is
-     * huge, so this one is deliberately the cheapest) and thin accent
-     * ribbons top and bottom. No glass body or shadow: the chat has to
-     * stay readable.
+     * Draws the StaffTools chat frame: a rounded glass-style perimeter,
+     * soft shadow, matching inner hairline, restrained orbit glow and
+     * accent ribbons at the top and bottom. The chat body stays untouched
+     * so every message remains readable.
      *
      * The whole frame sits {@link #FRAME_INSET} pixels away from the chat
      * area on the top and the bottom, so it never covers a message. It
@@ -890,14 +889,44 @@ public final class ChatResizer {
                 ? Ui.mix(Ui.PANEL_BORDER, Ui.ACCENT, 0.6f)
                 : Ui.PANEL_BORDER;
 
+        int radius = 8;
+
+        if (Ui.animationsEnabled()) {
+
+            Ui.drawShadow(
+                    context,
+                    area.left(),
+                    area.top(),
+                    area.width(),
+                    area.height(),
+                    radius,
+                    3,
+                    resizing || hovered ? 0.16f : 0.09f,
+                    alpha
+            );
+        }
+
         Ui.drawRoundBorder(
                 context,
                 area.left(),
                 area.top(),
                 area.width(),
                 area.height(),
-                3,
+                radius,
                 Ui.argb(frame, alpha)
+        );
+
+        Ui.drawRoundBorder(
+                context,
+                area.left() + 1,
+                area.top() + 1,
+                area.width() - 2,
+                area.height() - 2,
+                radius - 1,
+                Ui.argb(
+                        Ui.mix(Ui.TEXT, Ui.ACCENT, 0.55f),
+                        alpha * 0.08f
+                )
         );
 
         // the orbit animation of the menu / popup frames, trimmed down
@@ -912,30 +941,29 @@ public final class ChatResizer {
                 Ui.OrbitStyle.CHAT
         );
 
-        // accent ribbons, one pixel at the top and at the bottom of the
-        // frame, echoing the popup frame
+        // Accent ribbons follow the rounded top and bottom edges.
         if (area.width() > 12) {
 
             Ui.drawGradientH(
                     context,
-                    area.left() + 3,
-                    area.top() + 2,
-                    area.width() - 6,
+                    area.left() + radius,
+                    area.top() + 1,
+                    area.width() - radius * 2,
                     1,
                     Ui.ACCENT,
                     Ui.ACCENT_2,
-                    alpha * 0.7f
+                    alpha * (resizing || hovered ? 0.95f : 0.62f)
             );
 
             Ui.drawGradientH(
                     context,
-                    area.left() + 3,
-                    area.bottom() - 3,
-                    area.width() - 6,
+                    area.left() + radius,
+                    area.bottom() - 2,
+                    area.width() - radius * 2,
                     1,
                     Ui.ACCENT_2,
                     Ui.ACCENT,
-                    alpha * 0.35f
+                    alpha * (resizing || hovered ? 0.70f : 0.32f)
             );
         }
     }

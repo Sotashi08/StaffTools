@@ -30,6 +30,7 @@ public class ProfileSettings {
     private boolean detectClick = true;
     private boolean detectHover = true;
     private boolean detectAliases = true;
+    private boolean nickHighlightDisabled = false;
     private boolean detectUnicode = true;
     private boolean detectDecor = true;
     private boolean detectLine = true;
@@ -67,6 +68,8 @@ public class ProfileSettings {
                 config.isDetectHover();
         this.detectAliases =
                 config.isDetectAliases();
+        this.nickHighlightDisabled =
+                config.isNickHighlightDisabled();
         this.detectUnicode =
                 config.isDetectUnicode();
         this.detectDecor =
@@ -96,6 +99,9 @@ public class ProfileSettings {
         config.setDetectClick(detectClick);
         config.setDetectHover(detectHover);
         config.setDetectAliases(detectAliases);
+        config.setNickHighlightDisabled(
+                nickHighlightDisabled
+        );
         config.setDetectUnicode(detectUnicode);
         config.setDetectDecor(detectDecor);
         config.setDetectLine(detectLine);

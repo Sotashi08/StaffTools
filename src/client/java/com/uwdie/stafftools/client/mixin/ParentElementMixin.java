@@ -2,22 +2,57 @@ package com.uwdie.stafftools.client.mixin;
 
 import com.uwdie.stafftools.client.ui.ChatResizer;
 import com.uwdie.stafftools.client.ui.PlayerActionOverlay;
+import com.uwdie.stafftools.client.ui.Toasts;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * The mouse drag/release handlers live in the {@code ParentElement}
+ * The mouse click/drag/release handlers live in the {@code ParentElement}
  * interface as default methods, so we inject here and only act when the
  * current element is the chat screen. Since 1.21.9 they take a
  * {@link Click} record instead of raw coordinates.
+ *
+ * <p>{@code Screen} does not declare {@code mouseClicked} itself — it
+ * inherits the default method — so the toast click has to be handled
+ * here as well, not in {@link ScreenMixin}.
  */
 @Mixin(ParentElement.class)
 public interface ParentElementMixin {
+
+    /**
+     * A click on a toast expands or collapses it. Toasts float above the
+     * screen content, so they get the click first.
+     */
+    @Inject(
+            method = "mouseClicked",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    default void stafftools$onToastClick(
+            Click click,
+            boolean doubled,
+            CallbackInfoReturnable<Boolean> cir
+    ) {
+
+        if (!((Object) this instanceof Screen)) {
+            return;
+        }
+
+        if (Toasts.INSTANCE.mouseClicked(
+                click.x(),
+                click.y(),
+                click.button()
+        )) {
+
+            cir.setReturnValue(true);
+        }
+    }
 
     @Inject(
             method = "mouseDragged",

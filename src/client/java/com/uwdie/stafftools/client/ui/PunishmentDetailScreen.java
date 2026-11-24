@@ -2,7 +2,9 @@ package com.uwdie.stafftools.client.ui;
 
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import com.uwdie.stafftools.client.punishment.PunishmentHistory;
 import com.uwdie.stafftools.client.punishment.PunishmentRecord;
+import com.uwdie.stafftools.client.punishment.PunishmentStatus;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -32,8 +34,9 @@ public class PunishmentDetailScreen extends StScreen {
     /** Width kept free on the right for the scroll bar. */
     private static final int SCROLLBAR_RESERVE = 8;
 
-    private static final int CONTENT_TOP = 58;
+    private int CONTENT_TOP;
     private static final int FOOTER_H = 30;
+    private static final int MANUAL_FOOTER_H = 82;
     private static final int SCROLL_STEP = 22;
 
     private final Screen parent;
@@ -45,11 +48,20 @@ public class PunishmentDetailScreen extends StScreen {
     private final SimpleDateFormat dateFormat =
             new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
 
+    /** Whether the record is pending and can be manually resolved. */
+    private boolean canManualResolve() {
+        return record.getEffectiveStatus() == PunishmentStatus.PENDING ||
+                record.getEffectiveStatus() == PunishmentStatus.NO_RESPONSE;
+    }
+
     /** Laid-out rows for the current screen width. */
     private final List<Row> rows = new ArrayList<>();
 
     private int contentHeight;
     private int labelW;
+    private int panelX;
+    private int panelTop;
+    private int panelWidth;
     private int panelBottom;
     private int scroll;
 
@@ -80,13 +92,25 @@ public class PunishmentDetailScreen extends StScreen {
 
         resetSlots();
 
+        configureShell();
+
         clearChildren();
+
+        panelWidth = Math.min(contentWidth(), 560);
+        panelX = contentLeft()
+                + Math.max(0, (contentWidth() - panelWidth) / 2);
+        panelTop = contentTop() + 24;
+        CONTENT_TOP = panelTop + 38;
 
         layoutRows();
 
         panelBottom = Math.min(
-                CONTENT_TOP + contentHeight + FOOTER_H,
-                height - 8
+                Math.max(
+                        CONTENT_TOP + contentHeight
+                                + footerHeight() + PAD,
+                        panelTop + 120
+                ),
+                contentBottom()
         );
 
         // a resize may have folded the last rows out of view
@@ -96,10 +120,11 @@ public class PunishmentDetailScreen extends StScreen {
                 visibleSlack()
         );
 
+        int backButtonWidth = Math.max(1, Math.min(120, panelWidth - 24));
         button(
-                width / 2 - 60,
+                panelX + (panelWidth - backButtonWidth) / 2,
                 panelBottom - 26,
-                120,
+                backButtonWidth,
                 20,
                 Key.BTN_BACK,
                 b -> client.setScreen(
@@ -111,6 +136,59 @@ public class PunishmentDetailScreen extends StScreen {
                                 )
                 )
         );
+
+        // Manual resolution buttons for pending/no-response records
+        if (canManualResolve()) {
+            int btnY = panelBottom - 52;
+            int btnW = Math.min(120, Math.max(1, (panelWidth - 20) / 2));
+            int btnH = 20;
+            int centerX = panelX + panelWidth / 2;
+
+            button(
+                    centerX - btnW - 4,
+                    btnY,
+                    btnW,
+                    btnH,
+                    Key.BTN_MARK_DONE,
+                    b -> {
+                        record.setStatus(PunishmentStatus.DONE);
+                        record.setResponse(Lang.t(Key.TOAST_MARKED_DONE));
+                        PunishmentHistory.get().save();
+                        client.setScreen(new PunishmentDetailScreen(parent, record, serverKey));
+                    },
+                    Ui.SUCCESS
+            );
+
+            button(
+                    centerX + 4,
+                    btnY,
+                    btnW,
+                    btnH,
+                    Key.BTN_MARK_FAILED,
+                    b -> {
+                        record.setStatus(PunishmentStatus.FAILED);
+                        record.setResponse(Lang.t(Key.TOAST_MARKED_FAILED));
+                        PunishmentHistory.get().save();
+                        client.setScreen(new PunishmentDetailScreen(parent, record, serverKey));
+                    },
+                    Ui.DANGER
+            );
+
+            button(
+                    centerX - btnW / 2,
+                    btnY - btnH - 4,
+                    btnW,
+                    btnH,
+                    Key.BTN_MARK_PENDING,
+                    b -> {
+                        record.setStatus(PunishmentStatus.PENDING);
+                        record.setResponse(null);
+                        PunishmentHistory.get().save();
+                        client.setScreen(new PunishmentDetailScreen(parent, record, serverKey));
+                    },
+                    Ui.WARNING
+            );
+        }
     }
 
     /** Builds every row, pre-wrapped to the current width. */
@@ -118,7 +196,7 @@ public class PunishmentDetailScreen extends StScreen {
 
         rows.clear();
 
-        int inner = formWidth() - PAD * 2;
+        int inner = panelWidth - PAD * 2;
 
         // label column: as wide as the widest label, but never more than
         // a third of the panel, so values always keep a usable column
@@ -336,6 +414,17 @@ public class PunishmentDetailScreen extends StScreen {
             double verticalAmount
     ) {
 
+        if (mouseX < panelX || mouseX > panelX + panelWidth ||
+                mouseY < CONTENT_TOP ||
+                mouseY > panelBottom - footerHeight()) {
+            return super.mouseScrolled(
+                    mouseX,
+                    mouseY,
+                    horizontalAmount,
+                    verticalAmount
+            );
+        }
+
         scroll += verticalAmount > 0
                 ? -SCROLL_STEP
                 : SCROLL_STEP;
@@ -354,12 +443,18 @@ public class PunishmentDetailScreen extends StScreen {
         return Math.max(0, contentHeight - visibleHeight());
     }
 
+    private int footerHeight() {
+        return canManualResolve()
+                ? MANUAL_FOOTER_H
+                : FOOTER_H;
+    }
+
     /** Height of the scrollable band between the title and the button. */
     private int visibleHeight() {
 
         return Math.max(
                 0,
-                panelBottom - FOOTER_H - CONTENT_TOP
+                panelBottom - footerHeight() - CONTENT_TOP
         );
     }
 
@@ -374,46 +469,119 @@ public class PunishmentDetailScreen extends StScreen {
 
         Ui.drawPanel(
                 context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
+                panelX,
+                panelTop,
+                panelWidth,
+                panelBottom - panelTop,
                 alpha
         );
 
         Ui.drawOrbitFrame(
                 context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
+                panelX,
+                panelTop,
+                panelWidth,
+                panelBottom - panelTop,
                 alpha
         );
 
-        drawTitle(context, Key.DETAIL_TITLE, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDCC4",
+                Lang.t(Key.DETAIL_TITLE),
+                Lang.t(Key.MSG_HISTORY_HINT),
+                alpha
+        );
 
-        int left = formLeft();
+        int left = panelX;
+        int panelPad = left + PAD;
+        int statusWidth = Math.max(1, Math.min(
+                panelWidth / 2,
+                textRenderer.getWidth(status()) + 16
+        ));
+        int statusX = panelX + panelWidth - PAD - statusWidth;
+        int statusY = panelTop + 8;
+        int statusColor = switch (record.getEffectiveStatus()) {
+            case DONE -> Ui.SUCCESS;
+            case FAILED -> Ui.DANGER;
+            case NO_RESPONSE -> Ui.WARNING;
+            case PENDING -> Ui.ACCENT;
+        };
+
+        Ui.drawRoundRect(
+                context,
+                statusX,
+                statusY,
+                statusWidth,
+                16,
+                Design.RADIUS_SM,
+                Ui.argb(Ui.mix(Ui.SURFACE_2, statusColor, 0.18f), alpha)
+        );
+        Ui.drawRoundBorder(
+                context,
+                statusX,
+                statusY,
+                statusWidth,
+                16,
+                Design.RADIUS_SM,
+                Ui.argb(statusColor, alpha * 0.45f)
+        );
+        context.drawCenteredTextWithShadow(
+                textRenderer,
+                Text.literal(status()),
+                statusX + statusWidth / 2,
+                statusY + 4,
+                Ui.argb(statusColor, alpha)
+        );
+
+        String playerName = player() == null || player().isBlank()
+                ? Lang.t(Key.DETAIL_NONE)
+                : player();
+        String heading = Lang.t(Key.DETAIL_PLAYER) + " · " + playerName;
+        context.drawTextWithShadow(
+                textRenderer,
+                Text.literal(textRenderer.trimToWidth(
+                        heading,
+                        Math.max(1, statusX - panelPad - 8)
+                )),
+                panelPad,
+                panelTop + 12,
+                Ui.argb(Ui.TEXT, alpha)
+        );
+        Ui.drawDivider(
+                context,
+                panelPad,
+                panelTop + 30,
+                panelWidth - PAD * 2,
+                alpha
+        );
+
         int valueX = left + PAD + labelW;
 
-        int bottom = panelBottom - FOOTER_H;
+        int bottom = panelBottom - footerHeight();
 
-        // clip the band the rows may paint into
-        if (bottom > CONTENT_TOP) {
-
-            context.enableScissor(
-                    left,
-                    CONTENT_TOP,
-                    left + formWidth(),
-                    bottom
-            );
-        }
+        context.enableScissor(
+                panelPad,
+                CONTENT_TOP,
+                panelX + panelWidth - PAD,
+                Math.max(CONTENT_TOP + 1, bottom)
+        );
 
         int y = CONTENT_TOP - scroll;
+        int rowIndex = 0;
+        int rowWidth = Math.max(
+                1,
+                panelWidth - PAD * 2 - SCROLLBAR_RESERVE
+        );
 
         for (Row row : rows) {
 
             if (y + row.height < CONTENT_TOP) {
                 y += row.height;
+                rowIndex++;
                 continue;
             }
 
@@ -421,10 +589,28 @@ public class PunishmentDetailScreen extends StScreen {
                 break;
             }
 
+            Ui.drawRoundRect(
+                    context,
+                    panelPad,
+                    y - 3,
+                    rowWidth,
+                    Math.max(1, row.height - FIELD_GAP + 3),
+                    Design.RADIUS_SM,
+                    Ui.argb(
+                            rowIndex % 2 == 0
+                                    ? Ui.SURFACE_2
+                                    : Ui.SURFACE,
+                            alpha * 0.75f
+                    )
+            );
+
             // label, aligned with the first value line
             context.drawTextWithShadow(
                     textRenderer,
-                    Text.literal(row.label),
+                    Text.literal(textRenderer.trimToWidth(
+                            row.label,
+                            Math.max(1, labelW - 4)
+                    )),
                     left + PAD,
                     y + 1,
                     Ui.argb(Ui.TEXT_DIM, alpha)
@@ -445,6 +631,7 @@ public class PunishmentDetailScreen extends StScreen {
                 lineY += LINE_H;
             }
 
+            rowIndex++;
             y += row.height;
         }
 
@@ -481,7 +668,7 @@ public class PunishmentDetailScreen extends StScreen {
 
         Ui.drawRoundRect(
                 context,
-                formLeft() + formWidth() - PAD - 2,
+                panelX + panelWidth - PAD - 2,
                 thumbY,
                 2,
                 thumbH,

@@ -2,6 +2,7 @@ package com.uwdie.stafftools.client.ui.widget;
 
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import com.uwdie.stafftools.client.ui.Design;
 import com.uwdie.stafftools.client.ui.Ui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
@@ -12,16 +13,21 @@ import net.minecraft.client.input.AbstractInput;
 import java.util.function.Consumer;
 
 /**
- * Toggle that looks exactly like a regular StButton: same background,
- * border and label, with a small round color indicator on the right
- * (accent = on, muted gray = off).
+ * Toggle that looks like a regular StButton: same surface, border and
+ * label, with a small switch on the right whose knob slides between the
+ * off and on positions.
+ *
+ * <p>The knob position is animated, so flipping a switch reads as a
+ * physical movement rather than an instant colour swap.
  *
  * {@code Text} is inherited from {@link ButtonWidget} and names its own
  * nested class, so the message type is spelled out in full here.
  */
 public class StToggle extends ButtonWidget.Text {
 
-    private static final int DOT = 8;
+    private static final int TRACK_W = 18;
+    private static final int TRACK_H = 8;
+    private static final int KNOB = 6;
 
     private final long appear;
     private final int slot;
@@ -30,8 +36,11 @@ public class StToggle extends ButtonWidget.Text {
     private final String labelKey;
     private final TextRenderer textRenderer =
             MinecraftClient.getInstance().textRenderer;
+
     private boolean value;
+
     private float hoverAmt;
+    private float knobAmt;
     private boolean hoverSoundPlayed;
 
     public StToggle(
@@ -54,6 +63,7 @@ public class StToggle extends ButtonWidget.Text {
         this.onChange = onChange;
         this.labelKey = labelKey;
         this.value = initial;
+        this.knobAmt = initial ? 1f : 0f;
 
         updateMessage();
     }
@@ -102,11 +112,16 @@ public class StToggle extends ButtonWidget.Text {
             float delta
     ) {
 
-        long now = System.currentTimeMillis();
-
-        float alpha = Ui.clamp01(
-                (now - appear - slot * 28L) / 190f
+        // A short, restrained scale-and-fade entrance, staggered by slot.
+        float alpha = Ui.entranceProgress(
+                appear,
+                slot * 16L,
+                210L
         );
+
+        float scale = Ui.animationsEnabled()
+                ? 0.965f + 0.035f * alpha
+                : 1f;
 
         if (alpha <= 0.001f) {
             return;
@@ -121,23 +136,37 @@ public class StToggle extends ButtonWidget.Text {
             hoverSoundPlayed = false;
         }
 
-        hoverAmt += (hoverTarget - hoverAmt) *
-                Math.min(1f, delta * 13f);
+        hoverAmt = Ui.animateTowards(
+                hoverAmt,
+                hoverTarget,
+                delta,
+                13f
+        );
+
+        // knob slides between the two positions
+        knobAmt = Ui.animateTowards(
+                knobAmt,
+                value ? 1f : 0f,
+                delta,
+                16f
+        );
 
         int x = getX();
-        int y = getY();
+        int y = getY() - (Ui.animationsEnabled()
+                ? Math.round(hoverAmt)
+                : 0);
         int w = getWidth();
         int h = getHeight();
 
-        // identical to StButton
+        // identical surface to StButton
         int bg = Ui.mix(
-                0xFF171B22,
-                0xFF23334B,
+                Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.05f),
+                Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.22f),
                 hoverAmt
         );
 
         int border = Ui.mix(
-                0xFF2C3B55,
+                Ui.mix(Ui.PANEL_BORDER, Ui.TEXT, 0.08f),
                 Ui.ACCENT,
                 hoverAmt
         );
@@ -145,8 +174,33 @@ public class StToggle extends ButtonWidget.Text {
         context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
-                0,
-                (1 - alpha) * 5
+                x + w / 2f,
+                y + h / 2f
+        );
+
+        context.getMatrices().scale(scale, scale);
+
+        context.getMatrices().translate(
+                -(x + w / 2f),
+                -(y + h / 2f)
+        );
+
+        Ui.drawShadow(
+                context,
+                x, y, w, h,
+                Design.RADIUS_MD,
+                3,
+                0.14f + hoverAmt * 0.12f,
+                alpha
+        );
+
+        Ui.drawHoverGlow(
+                context,
+                x, y, w, h,
+                Design.RADIUS_MD,
+                Ui.ACCENT,
+                hoverAmt,
+                alpha
         );
 
         Ui.drawRoundRect(
@@ -155,7 +209,7 @@ public class StToggle extends ButtonWidget.Text {
                 y,
                 w,
                 h,
-                3,
+                Design.RADIUS_MD,
                 Ui.argb(bg, alpha)
         );
 
@@ -165,7 +219,7 @@ public class StToggle extends ButtonWidget.Text {
                 y,
                 w,
                 h,
-                3,
+                Design.RADIUS_MD,
                 Ui.argb(border, alpha)
         );
 
@@ -191,70 +245,75 @@ public class StToggle extends ButtonWidget.Text {
 
         context.drawTextWithShadow(
                 textRenderer,
-                net.minecraft.text.Text.literal(Lang.t(labelKey)),
+                net.minecraft.text.Text.literal(
+                        textRenderer.trimToWidth(
+                                Lang.t(labelKey),
+                                w - TRACK_W - 26
+                        )
+                ),
                 x + 10,
                 y + (h - 9) / 2,
                 Ui.argb(labelColor, alpha)
         );
 
-        // round color indicator instead of a slider
-        // (drawn manually: drawRoundRect breaks when radius == size/2)
-        int dx = x + w - DOT - 10;
-        int dy = y + (h - DOT) / 2;
-
-        int dotColor = value
-                ? Ui.mix(Ui.SUCCESS, Ui.ACCENT_SOFT, hoverAmt)
-                : Ui.mix(0xFF4A5568, 0xFF5A6A80, hoverAmt);
-
-        // dark outline
-        context.fill(
-                dx - 1,
-                dy + 1,
-                dx + DOT + 1,
-                dy + DOT - 1,
-                Ui.argb(0xFF0D1015, alpha)
-        );
-
-        context.fill(
-                dx + 1,
-                dy - 1,
-                dx + DOT - 1,
-                dy + DOT + 1,
-                Ui.argb(0xFF0D1015, alpha)
-        );
-
-        // filled body: vertical + horizontal bars overlap into a circle
-        context.fill(
-                dx + 2,
-                dy,
-                dx + DOT - 2,
-                dy + DOT,
-                Ui.argb(dotColor, alpha)
-        );
-
-        context.fill(
-                dx,
-                dy + 2,
-                dx + DOT,
-                dy + DOT - 2,
-                Ui.argb(dotColor, alpha)
-        );
-
-        // corner pixels to round it off
-        context.fill(dx + 1, dy + 1, dx + 2, dy + 2, Ui.argb(dotColor, alpha));
-        context.fill(dx + DOT - 2, dy + 1, dx + DOT - 1, dy + 2, Ui.argb(dotColor, alpha));
-        context.fill(dx + 1, dy + DOT - 2, dx + 2, dy + DOT - 1, Ui.argb(dotColor, alpha));
-        context.fill(dx + DOT - 2, dy + DOT - 2, dx + DOT - 1, dy + DOT - 1, Ui.argb(dotColor, alpha));
-
-        // top highlight
-        context.fill(
-                dx + 2,
-                dy + 1,
-                dx + DOT - 2,
-                dy + 2,
-                Ui.argb(0x66FFFFFF, alpha)
-        );
+        drawSwitch(context, x + w - TRACK_W - 10, y, alpha);
 
         context.getMatrices().popMatrix();
+    }
+
+    /** The switch: a rounded track with a sliding knob. */
+    private void drawSwitch(
+            DrawContext context,
+            int trackX,
+            int rowY,
+            float alpha
+    ) {
+
+        int trackY = rowY + (getHeight() - TRACK_H) / 2;
+
+        int trackColor = Ui.mix(
+                0xFF3A4453,
+                Ui.mix(Ui.ACCENT, Ui.SUCCESS, 0.35f),
+                knobAmt
+        );
+
+        Ui.drawRoundRect(
+                context,
+                trackX,
+                trackY,
+                TRACK_W,
+                TRACK_H,
+                Design.RADIUS_LG,
+                Ui.argb(trackColor, alpha)
+        );
+
+        Ui.drawRoundBorder(
+                context,
+                trackX,
+                trackY,
+                TRACK_W,
+                TRACK_H,
+                Design.RADIUS_LG,
+                Ui.argb(
+                        Ui.mix(0xFF0D1015, Ui.ACCENT, knobAmt * 0.5f),
+                        alpha
+                )
+        );
+
+        // knob travels from the left to the right end of the track
+        int travel = TRACK_W - KNOB - 2;
+
+        int knobX = trackX + 1 + (int) (travel * knobAmt);
+        int knobY = trackY + (TRACK_H - KNOB) / 2;
+
+        Ui.drawRoundRect(
+                context,
+                knobX,
+                knobY,
+                KNOB,
+                KNOB,
+                Design.RADIUS_MD,
+                Ui.argb(0xFFF2F5FA, alpha)
+        );
     }
 }

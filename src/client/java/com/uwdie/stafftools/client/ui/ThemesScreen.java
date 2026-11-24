@@ -15,13 +15,19 @@ import net.minecraft.text.Text;
 public class ThemesScreen extends StScreen {
 
     private static final int GRID_COLS = 4;
-    private static final int GRID_GAP = 8;
+    private static final int GRID_GAP = 6;
+    private static final int COMPACT_GRID_GAP = 4;
 
     private int gridX;
+    private int gridW;
     private int cardW = 90;
-    private int cardH = 52;
-    private int contentTop;
-    private int panelBottom;
+    private int cardH = 42;
+    private int gridGap = GRID_GAP;
+    private int headingTop;
+    private int gridTop;
+    private int gridViewportBottom;
+    private int gridScroll;
+    private int gridScrollMax;
 
     /** Caption and swatch grid of the nick highlight picker. */
     private int nickTop;
@@ -37,36 +43,52 @@ public class ThemesScreen extends StScreen {
 
         resetSlots();
 
+        configureShell();
+
         // widgets must be created HERE, once per screen open —
         // building them in renderTheme stacked copies every frame
         clearChildren();
 
         int rows = (Theme.count() + GRID_COLS - 1) / GRID_COLS;
+        int contentHeight = contentBottom() - contentTop();
+        int availW = Math.min(contentWidth(), 560);
 
-        int availW = formWidth() - 24;
-
+        headingTop = contentTop();
+        cardH = contentHeight < 260 ? 28 : 42;
+        gridGap = cardH < 36 ? COMPACT_GRID_GAP : GRID_GAP;
+        gridW = Math.max(0, availW - 8);
         cardW = Math.max(
-                80,
-                (availW - (GRID_COLS - 1) * GRID_GAP) / GRID_COLS
+                48,
+                (gridW - (GRID_COLS - 1) * gridGap)
+                        / GRID_COLS
         );
 
-        cardH = 52;
+        gridX = contentLeft();
+        gridTop = headingTop + 32;
 
-        int gridW = GRID_COLS * cardW
-                + (GRID_COLS - 1) * GRID_GAP;
+        // Keep all swatches on one row so the expanded theme grid can
+        // share the compact shell with the accent-color picker.
+        nickW = Math.min(contentWidth(), 560);
+        nickX = contentLeft();
+        nickTop = contentBottom()
+                - 26
+                - StColorPicker.heightOf(nickW)
+                - 14;
 
-        gridX = (width - gridW) / 2;
+        gridViewportBottom = Math.max(
+                gridTop,
+                nickTop - 13
+        );
 
-        contentTop = 74;
+        int gridContentHeight =
+                rows * (cardH + gridGap) - gridGap;
 
-        // the nick picker sits under the theme grid
-        nickW = Math.min(availW, 232);
-        nickX = (width - nickW) / 2;
-        nickTop = contentTop + rows * (cardH + GRID_GAP) + 10;
-
-        panelBottom = nickTop
-                + StColorPicker.heightOf(nickW)
-                + 44;
+        gridScrollMax = Math.max(
+                0,
+                gridContentHeight
+                        - (gridViewportBottom - gridTop)
+        );
+        gridScroll = Math.clamp(gridScroll, 0, gridScrollMax);
 
         addDrawableChild(
                 new StColorPicker(
@@ -87,8 +109,8 @@ public class ThemesScreen extends StScreen {
         );
 
         button(
-                width / 2 - 60,
-                panelBottom - 32,
+                contentLeft(),
+                contentBottom() - 26,
                 120,
                 20,
                 Key.BTN_BACK,
@@ -112,11 +134,11 @@ public class ThemesScreen extends StScreen {
     }
 
     private int cardX(int col) {
-        return gridX + col * (cardW + GRID_GAP);
+        return gridX + col * (cardW + gridGap);
     }
 
     private int cardY(int row) {
-        return contentTop + row * (cardH + GRID_GAP);
+        return gridTop + row * (cardH + gridGap) - gridScroll;
     }
 
     @Override
@@ -128,37 +150,88 @@ public class ThemesScreen extends StScreen {
             float alpha
     ) {
 
-        Ui.drawPanel(
+        Ui.drawSectionTitle(
                 context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
-                alpha
-        );
-        Ui.drawOrbitFrame(
-                context,
-                formLeft(),
-                34,
-                formWidth(),
-                panelBottom - 34,
+                textRenderer,
+                contentLeft(),
+                headingTop,
+                "\uD83C\uDFA8",
+                Lang.t(Key.BTN_THEMES),
+                Lang.t(Key.MSG_ACCENT_HINT),
                 alpha
         );
 
-        drawTitle(context, Key.BTN_THEMES, alpha);
+        if (gridViewportBottom > gridTop) {
 
-        for (int i = 0; i < Theme.count(); i++) {
-
-            drawThemeCard(
-                    context,
-                    i,
-                    mouseX,
-                    mouseY,
-                    alpha
+            context.enableScissor(
+                    gridX,
+                    gridTop,
+                    gridX + gridW,
+                    gridViewportBottom
             );
+
+            for (int i = 0; i < Theme.count(); i++) {
+
+                drawThemeCard(
+                        context,
+                        i,
+                        mouseX,
+                        mouseY,
+                        alpha
+                );
+            }
+
+            context.disableScissor();
         }
 
+        drawGridScrollbar(context, alpha);
+
         drawNickCaption(context, mouseX, mouseY, alpha);
+    }
+
+    private void drawGridScrollbar(
+            DrawContext context,
+            float alpha
+    ) {
+
+        int viewportHeight = gridViewportBottom - gridTop;
+
+        if (gridScrollMax <= 0 || viewportHeight <= 0) {
+            return;
+        }
+
+        int rows = (Theme.count() + GRID_COLS - 1) / GRID_COLS;
+        int totalHeight = rows * (cardH + gridGap) - gridGap;
+        int thumbHeight = Math.min(
+                viewportHeight,
+                Math.max(
+                        14,
+                        viewportHeight * viewportHeight / totalHeight
+                )
+        );
+        int thumbY = gridTop
+                + (viewportHeight - thumbHeight)
+                * gridScroll / gridScrollMax;
+        int x = gridX + gridW + 3;
+
+        Ui.drawRoundRect(
+                context,
+                x,
+                gridTop,
+                2,
+                viewportHeight,
+                1,
+                Ui.argb(Ui.BORDER, alpha * 0.7f)
+        );
+        Ui.drawRoundRect(
+                context,
+                x,
+                thumbY,
+                2,
+                thumbHeight,
+                1,
+                Ui.argb(Ui.ACCENT, alpha * 0.85f)
+        );
     }
 
     /** Caption above the nick swatches plus the reset link. */
@@ -220,56 +293,51 @@ public class ThemesScreen extends StScreen {
         int col = index % GRID_COLS;
         int rowIdx = index / GRID_COLS;
 
-        boolean selected =
-                index == Theme.getIndex();
+        boolean selected = index == Theme.getIndex();
 
-        boolean hovered =
-                isHovered(index, mouseX, mouseY);
+        boolean hovered = isHovered(index, mouseX, mouseY);
 
-        int lift =
-                hovered && !selected ? -1 : 0;
+        int lift = hovered && !selected ? -1 : 0;
 
         int x = cardX(col);
         int y = cardY(rowIdx) + lift;
 
-        int bg = selected
-                ? 0x303F8AE0
-                : hovered ? 0x26000000 : 0x18000000;
+        if (selected) {
 
-        context.fill(
-                x,
-                y,
-                x + cardW,
-                y + cardH,
-                Ui.argb(bg, alpha)
-        );
+            Ui.drawCardAccent(
+                    context, x, y, cardW, cardH,
+                    Ui.ACCENT, alpha
+            );
 
-        Ui.drawRoundBorder(
-                context,
-                x,
-                y,
-                cardW,
-                cardH,
-                3,
-                Ui.argb(
-                        selected ? Ui.ACCENT
-                                : hovered ? 0xFF3A4A66
-                                : 0xFF2C3B55,
-                        alpha * (selected || hovered ? 1f : 0.7f)
-                )
-        );
+        } else if (hovered) {
+
+            Ui.drawRoundRect(
+                    context, x, y, cardW, cardH, Design.RADIUS_MD,
+                    Ui.argb(Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.14f), alpha)
+            );
+
+            Ui.drawRoundBorder(
+                    context, x, y, cardW, cardH, Design.RADIUS_MD,
+                    Ui.argb(Ui.ACCENT, alpha * 0.85f)
+            );
+
+        } else {
+
+            Ui.drawCard(context, x, y, cardW, cardH, alpha);
+        }
 
         // gradient preview strip on top of the card
         int pw = cardW - 12;
         int px = x + 6;
-        int py = y + 7;
+        boolean compact = cardH < 36;
+        int py = y + (compact ? 4 : 7);
 
         Ui.drawGradientH(
                 context,
                 px,
                 py,
                 pw,
-                10,
+                compact ? 6 : 10,
                 Theme.accentOf(index),
                 Theme.accent2Of(index),
                 alpha
@@ -283,9 +351,9 @@ public class ThemesScreen extends StScreen {
 
         context.drawTextWithShadow(
                 textRenderer,
-                Text.literal(name),
+                Text.literal(textRenderer.trimToWidth(name, cardW - 12)),
                 x + 6,
-                py + 16,
+                compact ? y + 14 : py + 16,
                 Ui.argb(nameColor, alpha)
         );
 
@@ -295,7 +363,7 @@ public class ThemesScreen extends StScreen {
                     textRenderer,
                     Text.literal("✓"),
                     x + cardW - 16,
-                    py + 16,
+                    compact ? y + 14 : py + 16,
                     Ui.argb(Ui.SUCCESS, alpha)
             );
         }
@@ -315,8 +383,43 @@ public class ThemesScreen extends StScreen {
 
         return mouseX >= x &&
                 mouseX < x + cardW &&
+                mouseY >= gridTop &&
+                mouseY < gridViewportBottom &&
                 mouseY >= y &&
                 mouseY < y + cardH;
+    }
+
+    @Override
+    public boolean mouseScrolled(
+            double mouseX,
+            double mouseY,
+            double horizontalAmount,
+            double verticalAmount
+    ) {
+
+        if (gridScrollMax > 0
+                && mouseX >= gridX
+                && mouseX < gridX + gridW
+                && mouseY >= gridTop
+                && mouseY < gridViewportBottom) {
+
+            int step = cardH + gridGap;
+
+            gridScroll = Math.clamp(
+                    gridScroll + (verticalAmount > 0 ? -step : step),
+                    0,
+                    gridScrollMax
+            );
+
+            return true;
+        }
+
+        return super.mouseScrolled(
+                mouseX,
+                mouseY,
+                horizontalAmount,
+                verticalAmount
+        );
     }
 
     @Override
@@ -364,6 +467,14 @@ public class ThemesScreen extends StScreen {
                     StafftoolsClient.saveConfig();
 
                     Ui.playHover();
+
+                    com.uwdie.stafftools.client.audit.AuditLog.get()
+                            .info(
+                                    com.uwdie.stafftools.client.audit
+                                            .AuditCategory.CONFIG,
+                                    "Theme changed: "
+                                            + Lang.t(Theme.nameKey(i))
+                            );
 
                     // rebuild so everything repaints in new colors
                     client.setScreen(new ThemesScreen());

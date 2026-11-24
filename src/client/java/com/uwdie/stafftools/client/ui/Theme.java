@@ -5,9 +5,8 @@ package com.uwdie.stafftools.client.ui;
  * copies its colors into the public static fields of {@link Ui},
  * which every widget reads at render time — no other changes needed.
  *
- * A preset may define {@code accent2}: then ACCENT_2 differs from the
- * primary accent and all accent bars are rendered as a horizontal
- * gradient (ACCENT -> ACCENT_2).
+ * <p>Every preset keeps the same dark graphite surfaces and only swaps
+ * the accent, so the interface always reads as one product.
  */
 public final class Theme {
 
@@ -28,46 +27,82 @@ public final class Theme {
 
     private static final Palette[] PRESETS = {
             new Palette(
+                    "theme.amethyst",
+                    0xFFAC67ED, 0xFF8B5CF6, 0xFFC9A0F5, 0xFF7C3AED, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFAC67ED
+            ),
+            new Palette(
                     "theme.ocean",
-                    0xFF3F8AE0, 0, 0xFF7DBCFF, 0xFF2A5D9E, 0xFF2E5E9E,
-                    0xFFFFFFFF, 0xFFAAAAAA, 0xFF777777,
-                    0xF0141418, 0xFF7DBCFF
+                    0xFF3B82F6, 0xFF60A5FA, 0xFF93C5FD, 0xFF2563EB, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFF60A5FA
             ),
             new Palette(
                     "theme.emerald",
-                    0xFF2FCC8F, 0, 0xFF6FE7B8, 0xFF1D8A61, 0xFF1F7A57,
-                    0xFFFFFFFF, 0xFFA9C5B8, 0xFF6F8579,
-                    0xF0101714, 0xFF6FE7B8
-            ),
-            new Palette(
-                    "theme.amethyst",
-                    0xFF9B6FE3, 0xFFE36FC4, 0xFFC3A3FF, 0xFF6B44B8, 0xFF6C4FB3,
-                    0xFFFFFFFF, 0xFFBCB0CE, 0xFF7C7290,
-                    0xF0161219, 0xFFE36FC4
+                    0xFF10B981, 0xFF34D399, 0xFF6EE7B7, 0xFF059669, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFF34D399
             ),
             new Palette(
                     "theme.crimson",
-                    0xFFCB4848, 0, 0xFFE89B9B, 0xFF8F3232, 0xFF8F3A3A,
-                    0xFFFFFFFF, 0xFFC9AEAE, 0xFF856969,
-                    0xF0191010, 0xFFFF7A7A
+                    0xFFEF4444, 0xFFF87171, 0xFFFCA5A5, 0xFFDC2626, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFF87171
             ),
             new Palette(
                     "theme.dawn",
-                    0xFFD9A94E, 0xFFF2D49B, 0xFFF0D49A, 0xFF9C742F, 0xFF9C7434,
-                    0xFFFFFFFF, 0xFFD8CBA8, 0xFF8A7E64,
-                    0xF01A1710, 0xFFFFE08A
+                    0xFFF59E0B, 0xFFFBBF24, 0xFFFCD34D, 0xFFD97706, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFFBBF24
             ),
             new Palette(
                     "theme.aurora",
-                    0xFF35D0BA, 0xFF4FA8FF, 0xFF8FE8DB, 0xFF1F8F80, 0xFF1F7A93,
-                    0xFFFFFFFF, 0xFFAAC9CF, 0xFF68858B,
-                    0xF00E1717, 0xFF8FE8DB
+                    0xFF06B6D4, 0xFF22D3EE, 0xFF67E8F9, 0xFF0891B2, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFF22D3EE
             ),
             new Palette(
                     "theme.neon",
-                    0xFFFF3D8F, 0xFF38C6FF, 0xFFFFA1CC, 0xFFB21D63, 0xFF2E7FB8,
-                    0xFFFFFFFF, 0xFFC0B7CE, 0xFF7E7595,
-                    0xF0121018, 0xFF38C6FF
+                    0xFFEC4899, 0xFFF472B6, 0xFFF9A8D4, 0xFFDB2777, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFF472B6
+            ),
+            new Palette(
+                    "theme.sunset",
+                    0xFFFF795E, 0xFFFFC46B, 0xFFFFB49E, 0xFFE44871, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFFFA06E
+            ),
+            new Palette(
+                    "theme.twilight",
+                    0xFF7268F5, 0xFFEC6AA7, 0xFFC1B9FF, 0xFF5146D8, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFB48CF5
+            ),
+            new Palette(
+                    "theme.sakura",
+                    0xFFEC5C9B, 0xFFFFB4CF, 0xFFFFC5D8, 0xFFC83876, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFF487B4
+            ),
+            new Palette(
+                    "theme.glacier",
+                    0xFF38A8F5, 0xFF45D6CF, 0xFF9DEBFA, 0xFF2475C7, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFF62D6F0
+            ),
+            new Palette(
+                    "theme.mint",
+                    0xFF20B99B, 0xFF78D98B, 0xFFA8F0D8, 0xFF138B76, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFF4ED1A7
+            ),
+            new Palette(
+                    "theme.plum",
+                    0xFF9B5DE5, 0xFFF15BB5, 0xFFD8B4FE, 0xFF743CC0, 0xFF26262F,
+                    0xFFFFFFFF, 0xFFB4B4C0, 0xFF8A8A96,
+                    0xFF121218, 0xFFC77DFF
             )
     };
 
@@ -89,18 +124,21 @@ public final class Theme {
         Ui.ACCENT_SOFT = p.accentSoft();
         Ui.ACCENT_DARK = p.accentDark();
         Ui.PANEL_BORDER = p.border();
+        Ui.BORDER = p.border();
         Ui.TEXT = p.text();
         Ui.TEXT_DIM = p.textDim();
         Ui.TEXT_MUTED = p.textMuted();
 
         // semantic colors stay constant across themes
-        Ui.DANGER = 0xFFFF5555;
-        Ui.DANGER_SOFT = 0xFFFF8A8A;
-        Ui.SUCCESS = 0xFF55DD77;
-        Ui.WARNING = 0xFFEEBB55;
+        Ui.DANGER = 0xFFEF4444;
+        Ui.DANGER_SOFT = 0xFFF87171;
+        Ui.SUCCESS = 0xFF4ADE80;
+        Ui.WARNING = 0xFFF59E0B;
 
         Ui.PANEL_BG = p.panelBg();
-        Ui.PANEL_BG_SOFT = 0x22000000;
+        Ui.SURFACE = p.panelBg();
+        Ui.SURFACE_2 = 0xFF17171F;
+        Ui.PANEL_BG_SOFT = 0xFF17171F;
 
         // a manual pick wins over the theme default
         int nick =

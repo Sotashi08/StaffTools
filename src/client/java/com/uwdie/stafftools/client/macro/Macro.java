@@ -29,8 +29,7 @@ public class Macro {
         this.name = name;
         this.description = description;
 
-        this.commands =
-                new ArrayList<>(commands);
+        this.commands = mutableStrings(commands);
 
         this.aliases =
                 new ArrayList<>();
@@ -53,11 +52,11 @@ public class Macro {
     }
 
     public List<String> getCommands() {
-        return List.copyOf(commands);
+        return immutableStrings(commands);
     }
 
     public List<String> getAliases() {
-        return List.copyOf(aliases);
+        return immutableStrings(aliases);
     }
 
     public boolean isEnabled() {
@@ -84,16 +83,14 @@ public class Macro {
             List<String> commands
     ) {
 
-        this.commands =
-                new ArrayList<>(commands);
+        this.commands = mutableStrings(commands);
     }
 
     public void setAliases(
             List<String> aliases
     ) {
 
-        this.aliases =
-                new ArrayList<>(aliases);
+        this.aliases = mutableStrings(aliases);
     }
 
     public void setEnabled(boolean enabled) {
@@ -119,15 +116,39 @@ public class Macro {
                 UUID.randomUUID(),
                 name,
                 description,
-                commands
+                getCommands()
         );
 
-        clone.aliases = new ArrayList<>(aliases);
+        clone.aliases = mutableStrings(getAliases());
         clone.enabled = enabled;
         clone.dangerous = dangerous;
         clone.confirmationRequired = confirmationRequired;
 
         return clone;
+    }
+
+    private static ArrayList<String> mutableStrings(
+            List<String> values
+    ) {
+
+        ArrayList<String> copy = new ArrayList<>();
+
+        if (values != null) {
+            for (String value : values) {
+                if (value != null) {
+                    copy.add(value);
+                }
+            }
+        }
+
+        return copy;
+    }
+
+    private static List<String> immutableStrings(
+            List<String> values
+    ) {
+
+        return List.copyOf(mutableStrings(values));
     }
 
 }

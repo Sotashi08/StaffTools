@@ -105,6 +105,49 @@ public class MacroManager {
         configManager.save();
     }
 
+    /**
+     * Replaces the macro order with the given list. Used by the
+     * drag-to-reorder list; unknown ids are ignored so a stale drag can
+     * never resurrect a deleted macro.
+     */
+    public void reorder(List<Macro> ordered) {
+
+        if (ordered == null || ordered.isEmpty()) {
+            return;
+        }
+
+        List<Macro> current = config.getMacros();
+
+        List<Macro> next = new java.util.ArrayList<>();
+
+        for (Macro macro : ordered) {
+
+            for (Macro existing : current) {
+
+                if (existing.getId().equals(macro.getId())) {
+                    next.add(existing);
+                    break;
+                }
+            }
+        }
+
+        // keep any macro the caller did not know about
+        for (Macro existing : current) {
+
+            boolean present = next.stream().anyMatch(
+                    m -> m.getId().equals(existing.getId())
+            );
+
+            if (!present) {
+                next.add(existing);
+            }
+        }
+
+        config.setMacros(next);
+
+        configManager.save();
+    }
+
     public List<Macro> getMacros() {
         return List.copyOf(config.getMacros());
     }

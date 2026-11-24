@@ -8,6 +8,7 @@ import net.minecraft.client.network.PlayerListEntry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,9 +39,8 @@ import java.util.regex.Pattern;
  * Decorative sub-words of a longer display name are deliberately NOT
  * registered.
  *
- * Nicks learned here are reported with {@link PlayerMention#highlight()}
- * set to {@code false}: they are ordinary words inside somebody's
- * message, so they must not be repainted.
+ * Whether a learned nick is highlighted is controlled separately from
+ * whether it is detected, so it remains clickable when highlighting is off.
  */
 public final class EssentialsNickTracker {
 
@@ -73,6 +73,10 @@ public final class EssentialsNickTracker {
             )
     };
 
+    /** Finds name-shaped words inside decorated tab-list display names. */
+    private static final Pattern DISPLAY_NAME_WORD =
+            Pattern.compile("[A-Za-z0-9_]{2,16}");
+
     /**
      * Words that are ranks, suffixes or server furniture. They can never
      * be a /nick, so even an ambiguous source must not claim them.
@@ -90,12 +94,42 @@ public final class EssentialsNickTracker {
                     "health", "level", "rank", "group", "team", "clan",
                     "guild", "faction", "nation", "server", "lobby",
                     "hub", "survival", "creative", "skyblock",
-                    "one", "two", "the", "and", "for", "you"
+                    "one", "two", "the", "and", "for", "you",
+                    "ct", "cт", "adm", "мод",
+                    "модер", "модератор", "админ", "администратор",
+                    "хелпер", "саппорт", "вип", "премиум",
+                    "игрок", "участник", "владелец"
             );
 
-    /** visible nick (lower case) -> the account behind it */
-    private final Map<String, PlayerContext> byNick =
+    /** Maximum entries before LRU eviction. */
+    private static final int MAX_ENTRIES = 400;
+
+    /** Entries not accessed for this long are considered stale (1 hour). */
+    private static final long STALE_THRESHOLD_MS = 60 * 60 * 1000L;
+
+    /** Minimum interval between automatic cleanups (5 minutes). */
+    private static final long CLEANUP_INTERVAL_MS = 5 * 60 * 1000L;
+
+    /** visible nick (lower case) -> the account behind it with last-access timestamp */
+    private final Map<String, TrackedNick> byNick =
             new LinkedHashMap<>();
+
+    private long lastCleanupAt = 0;
+
+    /** Entry with last-access timestamp for stale cleanup. */
+    private static final class TrackedNick {
+        final PlayerContext owner;
+        long lastAccessed;
+
+        TrackedNick(PlayerContext owner) {
+            this.owner = owner;
+            this.lastAccessed = System.currentTimeMillis();
+        }
+
+        void touch() {
+            this.lastAccessed = System.currentTimeMillis();
+        }
+    }
 
     private EssentialsNickTracker() {
     }
@@ -107,6 +141,7 @@ public final class EssentialsNickTracker {
     public void clear() {
 
         byNick.clear();
+        lastCleanupAt = 0;
     }
 
 
@@ -154,18 +189,125 @@ public final class EssentialsNickTracker {
 
             String nick = soleNickOf(raw);
 
-            if (nick == null) {
-                continue;
-            }
-
-            learn(
-                    nick,
+            PlayerContext owner =
                     new PlayerContext(
                             real,
                             entry.getProfile().id()
-                    )
-            );
+                    );
+
+            if (nick != null) {
+                learn(nick, owner);
+            }
+
+            learnFromDisplayName(raw, owner);
         }
+    }
+
+    /**
+     * Learns name-shaped words from a changed tab-list display name.
+     *
+     * Rank labels and suffix words are filtered by {@link #NOT_A_NICK}.
+     * The real account name is excluded, so disabling Essentials
+     * highlighting cannot repaint an ordinary real nick.
+     */
+    public void learnFromDisplayName(
+            String displayName,
+            PlayerContext owner
+    ) {
+
+        if (displayName == null ||
+                displayName.isBlank() ||
+                owner == null ||
+                owner.name() == null ||
+                displayName.equalsIgnoreCase(owner.name())) {
+
+            return;
+        }
+
+        String cleaned = stripLegacy(displayName).trim();
+
+        if (cleaned.isEmpty()) {
+            return;
+        }
+
+        String folded =
+                TextNormalizer.unicodeFold(cleaned)
+                        .toLowerCase(Locale.ROOT);
+
+        if (isOnlyCosmeticNameChange(cleaned, owner.name())) {
+            return;
+        }
+
+        if (!folded.contains(" ") &&
+                folded.chars().allMatch(c ->
+                        TextNormalizer.isNameChar((char) c)
+                )) {
+
+            learn(folded, owner);
+        }
+
+        Matcher matcher = DISPLAY_NAME_WORD.matcher(folded);
+
+        while (matcher.find()) {
+            learn(matcher.group(), owner);
+        }
+    }
+
+    /**
+     * True when a display name contains the real account name and no
+     * separate custom name. Formatting, rank prefixes and legacy codes
+     * do not turn the original nick into an EssentialsX custom nick.
+     */
+    public static boolean isOnlyCosmeticNameChange(
+            String displayName,
+            String realName
+    ) {
+
+        if (displayName == null ||
+                realName == null ||
+                displayName.isBlank() ||
+                realName.isBlank()) {
+
+            return false;
+        }
+
+        String cleaned =
+                stripLegacy(displayName).trim();
+
+        if (cleaned.isEmpty()) {
+            return false;
+        }
+
+        String folded =
+                TextNormalizer.unicodeFold(cleaned)
+                        .toLowerCase(Locale.ROOT);
+
+        String real =
+                TextNormalizer.unicodeFold(realName)
+                        .toLowerCase(Locale.ROOT);
+
+        Matcher matcher = DISPLAY_NAME_WORD.matcher(folded);
+        boolean foundRealName = false;
+        boolean foundCustomName = false;
+
+        while (matcher.find()) {
+
+            String word =
+                    matcher.group().toLowerCase(Locale.ROOT);
+
+            if (word.equals(real)) {
+                foundRealName = true;
+                continue;
+            }
+
+            if (!isNotANick(word) &&
+                    !word.equalsIgnoreCase(realName)) {
+
+                foundCustomName = true;
+            }
+        }
+
+        return foundRealName && !foundCustomName;
     }
 
     /**
@@ -211,7 +353,7 @@ public final class EssentialsNickTracker {
 
     private static boolean isNotANick(String word) {
 
-        return NOT_A_NICK.contains(word.toLowerCase());
+        return NOT_A_NICK.contains(word.toLowerCase(Locale.ROOT));
     }
 
     /** Drops "§x" pairs. */
@@ -264,14 +406,20 @@ public final class EssentialsNickTracker {
             return;
         }
 
-        byNick.put(clean.toLowerCase(), owner);
-
-        if (byNick.size() > 400) {
-
-            String oldest =
-                    byNick.keySet().iterator().next();
-            byNick.remove(oldest);
+        String key = clean.toLowerCase(Locale.ROOT);
+        TrackedNick existing = byNick.get(key);
+        if (existing != null) {
+            existing.touch();
+            return;
         }
+
+        byNick.put(key, new TrackedNick(owner));
+
+        if (byNick.size() > MAX_ENTRIES) {
+            evictOldest();
+        }
+
+        maybeCleanup();
     }
 
     /**
@@ -311,8 +459,11 @@ public final class EssentialsNickTracker {
                             .orElse(null);
 
             if (owner == null) {
-                owner = byNick.get(
-                        oldNick.toLowerCase());
+                TrackedNick tracked = byNick.get(
+                        oldNick.toLowerCase(Locale.ROOT));
+                if (tracked != null) {
+                    owner = tracked.owner;
+                }
             }
 
             if (owner != null) {
@@ -329,10 +480,16 @@ public final class EssentialsNickTracker {
             return null;
         }
 
-        return byNick.get(nick.trim().toLowerCase());
-    }
+        String key = nick.trim().toLowerCase(Locale.ROOT);
+        TrackedNick tracked = byNick.get(key);
 
-    /** True when the given word is a known changed nick. */
+        if (tracked != null) {
+            tracked.touch();
+            return tracked.owner;
+        }
+
+        return null;
+    }
 
     /** Every changed nick known for one account. */
     public List<String> nicksOf(PlayerContext player) {
@@ -343,10 +500,10 @@ public final class EssentialsNickTracker {
             return result;
         }
 
-        for (Map.Entry<String, PlayerContext> entry :
+        for (Map.Entry<String, TrackedNick> entry :
                 byNick.entrySet()) {
 
-            if (entry.getValue().name()
+            if (entry.getValue().owner.name()
                     .equalsIgnoreCase(player.name())) {
 
                 result.add(entry.getKey());
@@ -354,6 +511,78 @@ public final class EssentialsNickTracker {
         }
 
         return result;
+    }
+
+    /**
+     * Checks whether text contains a tracked EssentialsX nick owned by
+     * this player. Formatting and Unicode look-alikes are normalized in
+     * the same way as they are for nick detection.
+     */
+    public boolean containsNickOf(
+            PlayerContext player,
+            String text
+    ) {
+
+        if (player == null ||
+                player.name() == null ||
+                text == null ||
+                text.isBlank()) {
+
+            return false;
+        }
+
+        String lower = TextNormalizer.unicodeFold(stripLegacy(text))
+                .toLowerCase(Locale.ROOT);
+
+        for (Map.Entry<String, TrackedNick> entry : byNick.entrySet()) {
+
+            TrackedNick tracked = entry.getValue();
+
+            if (!belongsTo(tracked.owner, player)) {
+                continue;
+            }
+
+            String nick = entry.getKey();
+            int index = lower.indexOf(nick);
+
+            while (index >= 0) {
+
+                int end = index + nick.length();
+                boolean left =
+                        index == 0 ||
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(index - 1)
+                                );
+                boolean right =
+                        end >= lower.length() ||
+                                !TextNormalizer.isNameChar(
+                                        lower.charAt(end)
+                                );
+
+                if (left && right) {
+                    tracked.touch();
+                    return true;
+                }
+
+                index = lower.indexOf(nick, index + 1);
+            }
+        }
+
+        return false;
+    }
+
+    private static boolean belongsTo(
+            PlayerContext first,
+            PlayerContext second
+    ) {
+
+        if (first.uuid() != null && second.uuid() != null) {
+            return first.uuid().equals(second.uuid());
+        }
+
+        return first.name() != null &&
+                second.name() != null &&
+                first.name().equalsIgnoreCase(second.name());
     }
 
     /** Accounts whose changed nick appears in the text. */
@@ -367,9 +596,9 @@ public final class EssentialsNickTracker {
 
         String lower =
                 TextNormalizer.unicodeFold(text)
-                        .toLowerCase();
+                        .toLowerCase(Locale.ROOT);
 
-        for (Map.Entry<String, PlayerContext> entry :
+        for (Map.Entry<String, TrackedNick> entry :
                 byNick.entrySet()) {
 
             String nick = entry.getKey();
@@ -392,7 +621,8 @@ public final class EssentialsNickTracker {
 
                 if (left && right) {
 
-                    result.add(entry.getValue());
+                    entry.getValue().touch();
+                    result.add(entry.getValue().owner);
 
                     break;
                 }
@@ -407,5 +637,33 @@ public final class EssentialsNickTracker {
         );
 
         return result;
+    }
+
+    /** Removes entries not accessed within the stale threshold. */
+    public void cleanupStaleEntries() {
+        long now = System.currentTimeMillis();
+        long cutoff = now - STALE_THRESHOLD_MS;
+
+        byNick.entrySet().removeIf(entry ->
+                entry.getValue().lastAccessed < cutoff
+        );
+
+        lastCleanupAt = now;
+    }
+
+    /** Triggers cleanup if enough time has passed since last cleanup. */
+    private void maybeCleanup() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupAt > CLEANUP_INTERVAL_MS) {
+            cleanupStaleEntries();
+        }
+    }
+
+    /** Evicts the oldest entry (LRU). */
+    private void evictOldest() {
+        if (!byNick.isEmpty()) {
+            String oldest = byNick.keySet().iterator().next();
+            byNick.remove(oldest);
+        }
     }
 }

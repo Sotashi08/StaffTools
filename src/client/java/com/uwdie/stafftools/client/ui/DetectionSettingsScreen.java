@@ -8,44 +8,27 @@ import com.uwdie.stafftools.client.ui.widget.StToggle;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * Toggles for every nick-detection method the mod supports.
- * Same visual language as the rest of the mod UI: framed panel, themed
- * rows with entrance stagger, spring scrolling.
+ * Toggles for every nick-detection method the mod supports, plus the
+ * chat-input and chat-resize switches. Same list chrome as the other
+ * screens: framed viewport, spring scrolling, edge fades.
  */
-public class DetectionSettingsScreen extends StScreen {
+public class DetectionSettingsScreen extends StListScreen {
 
     private static final int ROW_H = 24;
     private static final int ROW_GAP = 2;
     private static final int LIST_TOP = 46;
     private static final int BOTTOM_PAD = 40;
-    private static final int FADE_H = 12;
-
-    /** Rows live inside the frame, never flush with its border. */
-    private static final int ROW_PAD = 9;
-
-    private static final float SCROLL_STIFF = 240f;
-    private static final float SCROLL_DAMP = 19f;
-    private static final float SCROLL_RUBBER = 14f;
-    private static final float EDGE_STIFF = 420f;
-    private static final float EDGE_DAMP = 30f;
 
     private final Screen parent;
 
-    private float scroll;
-    private float scrollPos;
-    private float scrollVel;
-
-    private int listBottom;
-    private int rowLeft;
-    private int rowWidth;
-
     /** Rows are rebuilt on every init(), widgets follow them. */
-    private final List<ToggleRow> rows = new java.util.ArrayList<>();
+    private final List<ToggleRow> rows = new ArrayList<>();
 
     public DetectionSettingsScreen(Screen parent) {
 
@@ -79,13 +62,15 @@ public class DetectionSettingsScreen extends StScreen {
         rows.clear();
         clearChildren();
 
-        StaffToolsConfig config =
-                StafftoolsClient.getConfig();
+        configureShell();
 
-        rowWidth = Math.min(260, formWidth());
-        rowLeft = (width - rowWidth) / 2;
+        StaffToolsConfig config = StafftoolsClient.getConfig();
 
-        listBottom = height - BOTTOM_PAD;
+        rowWidth = Math.min(440, contentWidth());
+        rowLeft = contentLeft();
+
+        listTop = contentTop() + 40;
+        listBottom = contentBottom() - 40;
 
         add(Key.TOGGLE_DETECT_PLAIN,
                 config::isDetectPlain,
@@ -123,10 +108,6 @@ public class DetectionSettingsScreen extends StScreen {
                 config::isDetectLine,
                 config::setDetectLine);
 
-        add(Key.TOGGLE_DETECT_FUZZY,
-                config::isDetectFuzzy,
-                config::setDetectFuzzy);
-
         add(Key.TOGGLE_CHAT_INPUT,
                 config::isChatInputDetectEnabled,
                 config::setChatInputDetectEnabled);
@@ -135,15 +116,13 @@ public class DetectionSettingsScreen extends StScreen {
                 config::isChatResizeEnabled,
                 config::setChatResizeEnabled);
 
-        int step = ROW_H + ROW_GAP;
-
         for (int i = 0; i < rows.size(); i++) {
 
             ToggleRow row = rows.get(i);
 
             row.widget = toggle(
                     rowLeft + ROW_PAD,
-                    LIST_TOP + i * step,
+                    listTop + i * rowStep(),
                     rowWidth - ROW_PAD * 2,
                     18,
                     row.key,
@@ -152,15 +131,13 @@ public class DetectionSettingsScreen extends StScreen {
             );
         }
 
-        scroll = Math.min(scroll, maxScroll());
-        scrollPos = scroll;
-        scrollVel = 0f;
+        resetScroll();
 
         button(
                 rowLeft,
-                height - 32,
+                contentBottom() - 26,
                 rowWidth,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_BACK,
                 b -> client.setScreen(new StafftoolsScreen())
         );
@@ -174,77 +151,19 @@ public class DetectionSettingsScreen extends StScreen {
         rows.add(new ToggleRow(key, getter, setter));
     }
 
-    private int maxScroll() {
-
-        if (rows.isEmpty()) {
-            return 0;
-        }
-
-        int content =
-                rows.size() * ROW_H +
-                        (rows.size() - 1) * ROW_GAP;
-
-        return Math.max(
-                0,
-                content - (listBottom - LIST_TOP)
-        );
+    @Override
+    protected int rowCount() {
+        return rows.size();
     }
 
     @Override
-    public boolean mouseScrolled(
-            double mouseX,
-            double mouseY,
-            double horizontalAmount,
-            double verticalAmount
-    ) {
-
-        float step = ROW_H + ROW_GAP;
-
-        scroll += verticalAmount > 0 ? -step : step;
-
-        return true;
+    protected int rowStep() {
+        return ROW_H + ROW_GAP;
     }
 
-    private void updateScroll(float delta) {
-
-        float step = Ui.clamp01(delta) * 0.05f;
-        float max = maxScroll();
-
-        float target = Math.clamp(
-                scroll,
-                -SCROLL_RUBBER,
-                max + SCROLL_RUBBER
-        );
-
-        for (int i = 0; i < 3; i++) {
-
-            float s = step / 3f;
-
-            float accel =
-                    (target - scrollPos) * SCROLL_STIFF
-                            - scrollVel * SCROLL_DAMP;
-
-            float over = scrollPos < 0f
-                    ? scrollPos
-                    : scrollPos > max
-                    ? scrollPos - max
-                    : 0f;
-
-            if (over != 0f) {
-                accel -= over * EDGE_STIFF;
-                accel -= scrollVel * EDGE_DAMP;
-            }
-
-            scrollVel += accel * s;
-            scrollPos += scrollVel * s;
-        }
-
-        if (Math.abs(scrollPos - target) < 0.05f &&
-                Math.abs(scrollVel) < 0.05f) {
-
-            scrollPos = target;
-            scrollVel = 0f;
-        }
+    @Override
+    protected int rowHeight() {
+        return ROW_H;
     }
 
     @Override
@@ -256,63 +175,47 @@ public class DetectionSettingsScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.TITLE_DETECTION, alpha);
-
-        drawHint(context, Key.MSG_DETECT_HINT, 30, alpha);
-
-        Ui.drawPanel(
+        Ui.drawSectionTitle(
                 context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\u25C8",
+                Lang.t(Key.TITLE_DETECTION),
+                Lang.t(Key.MSG_DETECT_HINT),
                 alpha
         );
-        Ui.drawOrbitFrame(
-                context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
-                alpha
-        );
+
+        renderList(context, mouseX, mouseY, delta, alpha);
 
         if (rows.isEmpty()) {
 
             context.drawCenteredTextWithShadow(
                     textRenderer,
                     Lang.text(Key.MSG_DETECT_EMPTY),
-                    width / 2,
-                    LIST_TOP + 26,
+                    rowLeft + rowWidth / 2,
+                    listTop + 26,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
             );
-
-            return;
         }
+    }
 
-        updateScroll(delta);
-
-        int shift = (int) ((1f - alpha) * 14f);
-
-        context.enableScissor(
-                rowLeft + ROW_PAD,
-                LIST_TOP,
-                rowLeft + rowWidth - ROW_PAD,
-                listBottom
-        );
-
-        long now = System.currentTimeMillis();
+    @Override
+    protected void renderRows(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float delta,
+            float alpha
+    ) {
 
         for (int i = 0; i < rows.size(); i++) {
 
             ToggleRow row = rows.get(i);
 
-            int y = Math.round(
-                    LIST_TOP + i * (ROW_H + ROW_GAP) - scrollPos
-            );
+            int y = rowY(i);
 
-            boolean drawable =
-                    y + ROW_H > LIST_TOP && y < listBottom;
+            boolean drawable = rowVisible(i);
 
             if (row.widget != null) {
 
@@ -320,7 +223,7 @@ public class DetectionSettingsScreen extends StScreen {
 
                 row.widget.setVisible(
                         drawable &&
-                                y >= LIST_TOP &&
+                                y >= listTop &&
                                 y + ROW_H <= listBottom
                 );
             }
@@ -329,109 +232,21 @@ public class DetectionSettingsScreen extends StScreen {
                 continue;
             }
 
-            float rowAlpha = Ui.clamp01(
-                    (now - openTime - i * 22L) / 180f
-            );
+            float rowAlpha = rowAlpha(i);
 
             if (rowAlpha <= 0.01f) {
                 continue;
             }
 
             // rows are widgets, so only the backdrop is drawn here
-            context.fill(
+            Ui.drawCard(
+                    context,
                     rowLeft + ROW_PAD,
                     y,
-                    rowLeft + rowWidth - ROW_PAD,
-                    y + ROW_H,
-                    Ui.argb(Ui.PANEL_BG_SOFT, alpha * rowAlpha * 0.85f)
+                    rowWidth - ROW_PAD * 2,
+                    ROW_H,
+                    alpha * rowAlpha
             );
         }
-
-        context.disableScissor();
-
-        drawScrollMasks(context, alpha);
-    }
-
-    private void drawScrollMasks(
-            DrawContext context,
-            float alpha
-    ) {
-
-        float top = Ui.clamp01(scrollPos / FADE_H);
-        float bottom = Ui.clamp01(
-                (maxScroll() - scrollPos) / FADE_H
-        );
-
-        if (top > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    LIST_TOP,
-                    rowLeft + rowWidth - ROW_PAD,
-                    LIST_TOP + FADE_H,
-                    Ui.argb(Ui.PANEL_BG, alpha * top),
-                    Ui.argb(Ui.PANEL_BG, 0f)
-            );
-        }
-
-        if (bottom > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    listBottom - FADE_H,
-                    rowLeft + rowWidth - ROW_PAD,
-                    listBottom,
-                    Ui.argb(Ui.PANEL_BG, 0f),
-                    Ui.argb(Ui.PANEL_BG, alpha * bottom)
-            );
-        }
-    }
-
-    @Override
-    protected void renderOverlay(
-            DrawContext context,
-            int mouseX,
-            int mouseY,
-            float delta,
-            float alpha
-    ) {
-
-        drawScrollbar(context, alpha);
-    }
-
-    private void drawScrollbar(
-            DrawContext context,
-            float alpha
-    ) {
-
-        int max = maxScroll();
-
-        if (max <= 0) {
-            return;
-        }
-
-        int trackH = listBottom - LIST_TOP;
-
-        int thumbH = Math.max(
-                16,
-                (int) (trackH * trackH /
-                        (float) (trackH + max))
-        );
-
-        int travel = Math.max(1, trackH - thumbH);
-
-        Ui.drawRoundRect(
-                context,
-                rowLeft + rowWidth - 5,
-                LIST_TOP +
-                        (int) (travel * (scrollPos / (float) max)),
-                3,
-                thumbH,
-                2,
-                Ui.argb(
-                        Ui.mix(Ui.ACCENT_2, Ui.TEXT, 0.12f),
-                        alpha * 0.7f
-                )
-        );
     }
 }

@@ -29,6 +29,12 @@ public class StaffToolsConfig {
 
     private boolean toastsEnabled = true;
 
+    /** Journal of everything the mod does (audit screen). */
+    private boolean auditLogEnabled = true;
+
+    /** Sampling profiler for the mod's hot paths. */
+    private boolean profilerEnabled = true;
+
     private boolean savePopupSize = true;
 
     /** Keeps the resized chat size across game starts. */
@@ -45,8 +51,17 @@ public class StaffToolsConfig {
     private int popupWidth = DEFAULT_POPUP_WIDTH;
     private int popupHeight = DEFAULT_POPUP_HEIGHT;
 
-    /** Animated frame around the panels (menus + popups). */
+    /** Enables all optional motion and animated highlights in the UI. */
     private boolean menuAnimation = true;
+
+    /** Brand/title animation preset used on the main screen. */
+    private int titleAnimation = 1;
+
+    /** UI animation speed as a percentage (50..200). */
+    private int animationSpeed = 100;
+
+    /** Animated accent glow strength as a percentage (0..100). */
+    private int glowIntensity = 70;
 
     /** Grip that resizes the vanilla chat while it is open. */
     private boolean chatResizeEnabled = true;
@@ -64,6 +79,8 @@ public class StaffToolsConfig {
     private boolean detectClick = true;
     private boolean detectHover = true;
     private boolean detectAliases = true;
+    /** Disable nick color highlighting without disabling click/popups. */
+    private boolean nickHighlightDisabled = false;
     private boolean detectUnicode = true;
     private boolean detectDecor = true;
     private boolean detectLine = true;
@@ -175,6 +192,30 @@ public class StaffToolsConfig {
 
     public void setMenuAnimation(boolean enabled) {
         this.menuAnimation = enabled;
+    }
+
+    public int getTitleAnimation() {
+        return Math.clamp(titleAnimation, 0, 3);
+    }
+
+    public void setTitleAnimation(int animation) {
+        this.titleAnimation = Math.clamp(animation, 0, 3);
+    }
+
+    public int getAnimationSpeed() {
+        return Math.clamp(animationSpeed, 50, 200);
+    }
+
+    public void setAnimationSpeed(int animationSpeed) {
+        this.animationSpeed = Math.clamp(animationSpeed, 50, 200);
+    }
+
+    public int getGlowIntensity() {
+        return Math.clamp(glowIntensity, 0, 100);
+    }
+
+    public void setGlowIntensity(int glowIntensity) {
+        this.glowIntensity = Math.clamp(glowIntensity, 0, 100);
     }
 
     /** Corner grip that resizes the vanilla chat (width / height / scale). */
@@ -289,6 +330,14 @@ public class StaffToolsConfig {
         this.detectAliases = value;
     }
 
+    public boolean isNickHighlightDisabled() {
+        return nickHighlightDisabled;
+    }
+
+    public void setNickHighlightDisabled(boolean value) {
+        this.nickHighlightDisabled = value;
+    }
+
     public boolean isDetectUnicode() {
         return detectUnicode;
     }
@@ -335,6 +384,24 @@ public class StaffToolsConfig {
 
     public void setToastsEnabled(boolean enabled) {
         this.toastsEnabled = enabled;
+    }
+
+    /** Journal of macro runs, detections and punishment outcomes. */
+    public boolean isAuditLogEnabled() {
+        return auditLogEnabled;
+    }
+
+    public void setAuditLogEnabled(boolean enabled) {
+        this.auditLogEnabled = enabled;
+    }
+
+    /** Sampling profiler for the mod's hot paths. */
+    public boolean isProfilerEnabled() {
+        return profilerEnabled;
+    }
+
+    public void setProfilerEnabled(boolean enabled) {
+        this.profilerEnabled = enabled;
     }
 
     public int getThemeIndex() {

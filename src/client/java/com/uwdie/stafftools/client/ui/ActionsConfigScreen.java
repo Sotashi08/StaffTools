@@ -5,6 +5,7 @@ import com.uwdie.stafftools.client.config.ActionEntry;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.ui.widget.StButton;
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -14,45 +15,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Player-action list, styled like the rest of the mod UI: framed panel,
- * themed rows with entrance stagger, hover highlight and StButtons.
- * Rows scroll by moving their buttons, so nothing is ever rebuilt.
+ * Player-action list: a framed viewport of cards, each with a drag
+ * handle, a status dot, the label, the command and its own buttons.
+ * Rows can be reordered by dragging.
  */
-public class ActionsConfigScreen extends StScreen {
+public class ActionsConfigScreen extends StListScreen {
 
     private static final int ROW_H = 30;
     private static final int ROW_GAP = 3;
     private static final int LIST_TOP = 46;
     private static final int BOTTOM_PAD = 44;
     private static final int BTN_H = 18;
-    private static final int FADE_H = 12;
-
-    /** Rows live inside the frame, never flush with its border. */
-    private static final int ROW_PAD = 9;
-
-    // same spring + rubber band as the in-chat actions popup
-    private static final float SCROLL_STIFF = 240f;
-    private static final float SCROLL_DAMP = 19f;
-    private static final float SCROLL_RUBBER = 14f;
-    private static final float EDGE_STIFF = 420f;
-    private static final float EDGE_DAMP = 30f;
 
     private final Screen parent;
 
-    private float scroll;
-    private float scrollPos;
-    private float scrollVel;
     private boolean needsRebuild;
-    private int listBottom;
-    private int rowLeft;
-    private int rowWidth;
 
-    private final List<Row> rows =
-            new ArrayList<>();
+    /** Drag-to-reorder state for the rows. */
+    private final DragReorder drag = new DragReorder();
+
+    private final List<Row> rows = new ArrayList<>();
 
     public ActionsConfigScreen(Screen parent) {
-
         super(Lang.text(Key.BTN_PLAYER_ACTIONS));
+
         this.parent = parent;
     }
 
@@ -77,37 +63,34 @@ public class ActionsConfigScreen extends StScreen {
         rows.clear();
         clearChildren();
 
+        configureShell();
+
         List<ActionEntry> entries =
-                StafftoolsClient.getConfig()
-                        .getActionEntries();
+                StafftoolsClient.getConfig().getActionEntries();
 
-        rowWidth = Math.min(300, formWidth());
-        rowLeft = (width - rowWidth) / 2;
+        rowWidth = Math.min(440, contentWidth());
+        rowLeft = contentLeft();
 
-        listBottom = height - BOTTOM_PAD;
-
-        int step = ROW_H + ROW_GAP;
+        listTop = contentTop() + 40;
+        listBottom = contentBottom() - 40;
 
         for (int i = 0; i < entries.size(); i++) {
 
-            Row row =
-                    new Row(entries.get(i), i, LIST_TOP + i * step);
+            Row row = new Row(entries.get(i), i);
 
             rows.add(row);
             addRowButtons(row);
         }
 
-        scroll = Math.min(scroll, maxScroll());
-        scrollPos = scroll;
-        scrollVel = 0f;
+        resetScroll();
 
         int half = (rowWidth - 10) / 2;
 
         button(
                 rowLeft,
-                height - 32,
+                contentBottom() - 26,
                 half,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_ADD_ACTION,
                 b -> client.setScreen(
                         new ActionEntryEditScreen(this, null, true)
@@ -116,39 +99,36 @@ public class ActionsConfigScreen extends StScreen {
 
         button(
                 rowLeft + half + 10,
-                height - 32,
+                contentBottom() - 26,
                 half,
-                22,
+                Design.H_BUTTON_LG,
                 Key.BTN_BACK,
                 b -> client.setScreen(new StafftoolsScreen())
         );
     }
 
-    private int maxScroll() {
+    @Override
+    protected int rowCount() {
+        return rows.size();
+    }
 
-        if (rows.isEmpty()) {
-            return 0;
-        }
+    @Override
+    protected int rowStep() {
+        return ROW_H + ROW_GAP;
+    }
 
-        int content =
-                rows.size() * ROW_H +
-                        (rows.size() - 1) * ROW_GAP;
-
-        return Math.max(
-                0,
-                content - (listBottom - LIST_TOP)
-        );
+    @Override
+    protected int rowHeight() {
+        return ROW_H;
     }
 
     private void addRowButtons(Row row) {
-
-        int y = row.baseY + (ROW_H - BTN_H) / 2;
 
         int right = rowLeft + rowWidth - ROW_PAD - 5;
 
         row.btnDelete = button(
                 right - 36,
-                y,
+                0,
                 36,
                 BTN_H,
                 Key.BTN_DELETE,
@@ -168,7 +148,7 @@ public class ActionsConfigScreen extends StScreen {
 
         row.btnEdit = button(
                 right - 36 - 3 - 48,
-                y,
+                0,
                 48,
                 BTN_H,
                 Key.BTN_EDIT,
@@ -181,7 +161,7 @@ public class ActionsConfigScreen extends StScreen {
 
         row.btnDown = glyphButton(
                 right - 36 - 3 - 48 - 3 - 20,
-                y,
+                0,
                 20,
                 "\u25BC",
                 b -> move(row.index, 1)
@@ -189,7 +169,7 @@ public class ActionsConfigScreen extends StScreen {
 
         row.btnUp = glyphButton(
                 right - 36 - 3 - 48 - 3 - 20 - 3 - 20,
-                y,
+                0,
                 20,
                 "\u25B2",
                 b -> move(row.index, -1)
@@ -239,14 +219,11 @@ public class ActionsConfigScreen extends StScreen {
     private void move(int index, int delta) {
 
         List<ActionEntry> entries =
-                StafftoolsClient.getConfig()
-                        .getActionEntries();
+                StafftoolsClient.getConfig().getActionEntries();
 
         int target = index + delta;
 
-        if (target < 0 ||
-                target >= entries.size()) {
-
+        if (target < 0 || target >= entries.size()) {
             return;
         }
 
@@ -261,67 +238,104 @@ public class ActionsConfigScreen extends StScreen {
         needsRebuild = true;
     }
 
+    // ------------------------------------------------------------------
+    // drag to reorder
+    // ------------------------------------------------------------------
+
     @Override
-    public boolean mouseScrolled(
-            double mouseX,
-            double mouseY,
-            double horizontalAmount,
-            double verticalAmount
+    public boolean mouseClicked(
+            Click click,
+            boolean doubled
     ) {
 
-        float step = ROW_H + ROW_GAP;
+        if (click.button() == 0 &&
+                !drag.isDragging() &&
+                !isOverWidget(click.x(), click.y()) &&
+                insideList(click.x(), click.y())) {
 
-        scroll += verticalAmount > 0 ? -step : step;
+            int index = rowIndexAt(click.y());
 
-        return true;
-    }
-
-    /**
-     * Same spring as the chat popup: slightly underdamped, so every
-     * notch settles with a small overshoot, plus a rubber band at the
-     * ends of the list.
-     */
-    private void updateScroll(float delta) {
-
-        float step = Ui.clamp01(delta) * 0.05f;
-        float max = maxScroll();
-
-        float target = Math.clamp(
-                scroll,
-                -SCROLL_RUBBER,
-                max + SCROLL_RUBBER
-        );
-
-        for (int i = 0; i < 3; i++) {
-
-            float s = step / 3f;
-
-            float accel =
-                    (target - scrollPos) * SCROLL_STIFF
-                            - scrollVel * SCROLL_DAMP;
-
-            float over = scrollPos < 0f
-                    ? scrollPos
-                    : scrollPos > max
-                    ? scrollPos - max
-                    : 0f;
-
-            if (over != 0f) {
-                accel -= over * EDGE_STIFF;
-                accel -= scrollVel * EDGE_DAMP;
+            if (index >= 0) {
+                drag.press(index, click.y());
             }
-
-            scrollVel += accel * s;
-            scrollPos += scrollVel * s;
         }
 
-        if (Math.abs(scrollPos - target) < 0.05f &&
-                Math.abs(scrollVel) < 0.05f) {
-
-            scrollPos = target;
-            scrollVel = 0f;
-        }
+        return super.mouseClicked(click, doubled);
     }
+
+    /** True when a row button sits under the cursor. */
+    private boolean isOverWidget(double mouseX, double mouseY) {
+
+        for (var child : children()) {
+
+            if (child.isMouseOver(mouseX, mouseY)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean mouseDragged(
+            Click click,
+            double offsetX,
+            double offsetY
+    ) {
+
+        if (drag.drag(
+                click.y(),
+                listTop,
+                rowStep(),
+                rows.size(),
+                scrollPos
+        )) {
+
+            return true;
+        }
+
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+
+        int to = drag.targetIndex();
+
+        int from = drag.release();
+
+        if (from >= 0) {
+            reorder(from, to);
+        }
+
+        return super.mouseReleased(click);
+    }
+
+    /** Moves an action to a new position and persists the order. */
+    private void reorder(int from, int to) {
+
+        List<ActionEntry> entries =
+                StafftoolsClient.getConfig().getActionEntries();
+
+        if (from < 0 || from >= entries.size() ||
+                to < 0 || to >= entries.size() ||
+                from == to) {
+
+            return;
+        }
+
+        ActionEntry moved = entries.remove(from);
+
+        entries.add(to, moved);
+
+        StafftoolsClient.saveConfig();
+
+        needsRebuild = true;
+    }
+
+    // ------------------------------------------------------------------
+    // rendering
+    // ------------------------------------------------------------------
 
     @Override
     protected void renderTheme(
@@ -332,65 +346,50 @@ public class ActionsConfigScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.BTN_PLAYER_ACTIONS, alpha);
-
-        drawHint(context, Key.MSG_ACTIONS_HINT, 30, alpha);
-
-        Ui.drawPanel(
+        Ui.drawSectionTitle(
                 context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDCCB",
+                Lang.t(Key.BTN_PLAYER_ACTIONS),
+                Lang.t(Key.MSG_ACTIONS_HINT),
                 alpha
         );
-        Ui.drawOrbitFrame(
-                context,
-                rowLeft,
-                LIST_TOP - 8,
-                rowWidth,
-                listBottom - LIST_TOP + 16,
-                alpha
-        );
+
+        renderList(context, mouseX, mouseY, delta, alpha);
 
         if (rows.isEmpty()) {
 
             context.drawCenteredTextWithShadow(
                     textRenderer,
                     Lang.text(Key.MSG_NO_ACTIONS),
-                    width / 2,
-                    LIST_TOP + 26,
+                    rowLeft + rowWidth / 2,
+                    listTop + 26,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
             );
-
-            return;
         }
+    }
 
-        long now = System.currentTimeMillis();
+    @Override
+    protected void renderRows(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float delta,
+            float alpha
+    ) {
 
-        updateScroll(delta);
-
-        // rows must never leave the frame: clip to the list viewport
-        // (the entrance animation shifts the whole form by up to 14px)
-        int shift = (int) ((1f - alpha) * 14f);
-
-        context.enableScissor(
-                rowLeft + ROW_PAD,
-                LIST_TOP,
-                rowLeft + rowWidth - ROW_PAD,
-                listBottom
-        );
+        int dragFrom = drag.isDragging() ? drag.fromIndex() : -1;
+        int dragTo = drag.isDragging() ? drag.targetIndex() : -1;
 
         for (int i = 0; i < rows.size(); i++) {
 
             Row row = rows.get(i);
 
-            int y = Math.round(row.baseY - scrollPos);
+            int y = rowY(i);
 
-            // partially visible rows still draw (clipped), but their
-            // buttons only show while the whole button fits in view
-            boolean drawable =
-                    y + ROW_H > LIST_TOP && y < listBottom;
+            boolean drawable = rowVisible(i);
 
             int buttonY = y + (ROW_H - BTN_H) / 2;
 
@@ -398,17 +397,16 @@ public class ActionsConfigScreen extends StScreen {
                     row,
                     buttonY,
                     drawable &&
-                            buttonY >= LIST_TOP &&
-                            buttonY + BTN_H <= listBottom
+                            buttonY >= listTop &&
+                            buttonY + BTN_H <= listBottom &&
+                            !drag.isDragging()
             );
 
             if (!drawable) {
                 continue;
             }
 
-            float rowAlpha = Ui.clamp01(
-                    (now - openTime - i * 22L) / 180f
-            );
+            float rowAlpha = rowAlpha(i);
 
             if (rowAlpha <= 0.01f) {
                 continue;
@@ -420,13 +418,41 @@ public class ActionsConfigScreen extends StScreen {
                     y,
                     mouseX,
                     mouseY,
-                    alpha * rowAlpha
+                    alpha * rowAlpha,
+                    i == dragFrom
             );
         }
 
-        context.disableScissor();
+        drawDropIndicator(context, dragTo, alpha);
+    }
 
-        drawScrollMasks(context, alpha);
+    /** Accent line showing where the dragged row will land. */
+    private void drawDropIndicator(
+            DrawContext context,
+            int target,
+            float alpha
+    ) {
+
+        if (target < 0) {
+            return;
+        }
+
+        int lineY = Math.clamp(
+                rowY(target),
+                listTop,
+                listBottom - 2
+        );
+
+        Ui.drawGradientH(
+                context,
+                rowLeft + ROW_PAD,
+                lineY,
+                rowWidth - ROW_PAD * 2,
+                2,
+                Ui.ACCENT,
+                Ui.ACCENT_2,
+                alpha
+        );
     }
 
     private void drawRow(
@@ -435,49 +461,64 @@ public class ActionsConfigScreen extends StScreen {
             int y,
             int mouseX,
             int mouseY,
-            float alpha
+            float alpha,
+            boolean dragging
     ) {
 
         ActionEntry entry = row.entry;
 
+        int rx = rowLeft + ROW_PAD;
+        int rw = rowWidth - ROW_PAD * 2;
+        int rh = ROW_H - 2;
+
         boolean hovered =
-                mouseX >= rowLeft + ROW_PAD &&
-                        mouseX <= rowLeft + rowWidth - ROW_PAD &&
-                        mouseY >= y &&
-                        mouseY <= y + ROW_H - 2;
+                mouseX >= rx && mouseX <= rx + rw &&
+                        mouseY >= y && mouseY <= y + rh;
 
-        int bg = hovered
-                ? Ui.argb(0x403F8AE0, alpha)
-                : Ui.argb(Ui.PANEL_BG_SOFT, alpha * 0.85f);
+        if (dragging) {
 
-        Ui.drawRoundRect(
-                context,
-                rowLeft + ROW_PAD,
-                y,
-                rowWidth - ROW_PAD * 2,
-                ROW_H - 2,
-                3,
-                bg
-        );
+            Ui.drawCardAccent(
+                    context, rx, y, rw, rh,
+                    Ui.ACCENT, alpha
+            );
 
-        Ui.drawRoundBorder(
-                context,
-                rowLeft + ROW_PAD,
-                y,
-                rowWidth - ROW_PAD * 2,
-                ROW_H - 2,
-                3,
-                Ui.argb(
-                        hovered ? Ui.ACCENT : 0xFF2C3B55,
-                        alpha * (hovered ? 1f : 0.55f)
-                )
-        );
+        } else if (hovered) {
+
+            Ui.drawRoundRect(
+                    context, rx, y, rw, rh, Design.RADIUS_MD,
+                    Ui.argb(Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.16f), alpha)
+            );
+
+            Ui.drawRoundBorder(
+                    context, rx, y, rw, rh, Design.RADIUS_MD,
+                    Ui.argb(Ui.ACCENT, alpha * 0.9f)
+            );
+
+        } else {
+
+            Ui.drawCard(context, rx, y, rw, rh, alpha);
+        }
+
+        // drag handle: three dots on the left edge
+        for (int d = 0; d < 3; d++) {
+
+            context.fill(
+                    rx + 4,
+                    y + 6 + d * 4,
+                    rx + 6,
+                    y + 8 + d * 4,
+                    Ui.argb(
+                            dragging ? Ui.ACCENT : Ui.TEXT_MUTED,
+                            alpha * (dragging ? 1f : 0.55f)
+                    )
+            );
+        }
 
         // status dot: on / off
         context.fill(
-                rowLeft + 5,
+                rx + 10,
                 y + 3,
-                rowLeft + 7,
+                rx + 12,
                 y + 5,
                 Ui.argb(
                         entry.isEnabled()
@@ -488,12 +529,11 @@ public class ActionsConfigScreen extends StScreen {
         );
 
         // leave a gap before the button column
-        int textW = Math.max(50, rowWidth - ROW_PAD * 2 - 153);
+        int textW = Math.max(50, rw - 160);
 
-        String icon =
-                entry.getIcon() == null
-                        ? ""
-                        : entry.getIcon();
+        String icon = entry.getIcon() == null
+                ? ""
+                : entry.getIcon();
 
         String name = icon + " " + entry.getLabel();
 
@@ -502,7 +542,7 @@ public class ActionsConfigScreen extends StScreen {
                 Text.literal(
                         textRenderer.trimToWidth(name, textW)
                 ),
-                rowLeft + ROW_PAD + 11,
+                rx + 15,
                 y + 4,
                 Ui.argb(
                         entry.isEnabled() ? Ui.TEXT : Ui.TEXT_MUTED,
@@ -510,108 +550,18 @@ public class ActionsConfigScreen extends StScreen {
                 )
         );
 
-        String command =
-                entry.isConfirmationRequired()
-                        ? "⚠ " + entry.getCommand()
-                        : entry.getCommand();
+        String command = entry.isConfirmationRequired()
+                ? "⚠ " + entry.getCommand()
+                : entry.getCommand();
 
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
                         textRenderer.trimToWidth(command, textW)
                 ),
-                rowLeft + ROW_PAD + 11,
+                rx + 15,
                 y + 15,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
-        );
-    }
-
-    /** Soft fades at the list edges, kept inside the panel border. */
-    private void drawScrollMasks(
-            DrawContext context,
-            float alpha
-    ) {
-
-        float top = Ui.clamp01(scrollPos / FADE_H);
-
-        float bottom = Ui.clamp01(
-                (maxScroll() - scrollPos) / FADE_H
-        );
-
-        if (top > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    LIST_TOP,
-                    rowLeft + rowWidth - ROW_PAD,
-                    LIST_TOP + FADE_H,
-                    Ui.argb(Ui.PANEL_BG, alpha * top),
-                    Ui.argb(Ui.PANEL_BG, 0f)
-            );
-        }
-
-        if (bottom > 0.01f) {
-
-            context.fillGradient(
-                    rowLeft + ROW_PAD,
-                    listBottom - FADE_H,
-                    rowLeft + rowWidth - ROW_PAD,
-                    listBottom,
-                    Ui.argb(Ui.PANEL_BG, 0f),
-                    Ui.argb(Ui.PANEL_BG, alpha * bottom)
-            );
-        }
-    }
-
-    @Override
-    protected void renderOverlay(
-            DrawContext context,
-            int mouseX,
-            int mouseY,
-            float delta,
-            float alpha
-    ) {
-
-        drawScrollbar(context, alpha);
-    }
-
-    /** Slim scrollbar drawn above the widgets. */
-    private void drawScrollbar(
-            DrawContext context,
-            float alpha
-    ) {
-
-        int max = maxScroll();
-
-        if (max <= 0) {
-            return;
-        }
-
-        int trackH = listBottom - LIST_TOP;
-
-        int thumbH = Math.max(
-                16,
-                (int) (trackH * trackH /
-                        (float) (trackH + max))
-        );
-
-        int travel = Math.max(1, trackH - thumbH);
-
-        int x = rowLeft + rowWidth - 5;
-        int y = LIST_TOP +
-                (int) (travel * (scrollPos / (float) max));
-
-        Ui.drawRoundRect(
-                context,
-                x,
-                y,
-                3,
-                thumbH,
-                2,
-                Ui.argb(
-                        Ui.mix(Ui.ACCENT_2, Ui.TEXT, 0.12f),
-                        alpha * 0.7f
-                )
         );
     }
 
@@ -619,16 +569,14 @@ public class ActionsConfigScreen extends StScreen {
 
         private final ActionEntry entry;
         private final int index;
-        private final int baseY;
         private StButton btnUp;
         private StButton btnDown;
         private StButton btnEdit;
         private StButton btnDelete;
 
-        private Row(ActionEntry entry, int index, int baseY) {
+        private Row(ActionEntry entry, int index) {
             this.entry = entry;
             this.index = index;
-            this.baseY = baseY;
         }
     }
 }

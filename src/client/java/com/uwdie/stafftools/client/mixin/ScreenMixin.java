@@ -15,6 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Draws the actions popup and the toasts on every screen except the
  * chat one (that one is covered by {@link ChatScreenMixin}, which has
  * to draw them on top).
+ *
+ * <p>Toast clicks are routed in {@link ParentElementMixin}: {@code Screen}
+ * does not declare {@code mouseClicked} itself, so it cannot be injected
+ * here.
  */
 @Mixin(Screen.class)
 public class ScreenMixin {

@@ -26,8 +26,19 @@ public final class NickCache {
             new NickCache();
 
     /** Insertion ordered: the newest nick wins on a cap. */
-    private final Map<String, PlayerContext> nicks =
+    private final Map<String, CachedNick> nicks =
             new LinkedHashMap<>();
+
+    /** Maximum entries before LRU eviction. */
+    private static final int MAX_ENTRIES = 600;
+
+    /** Entries not accessed for this long are considered stale (1 hour). */
+    private static final long STALE_THRESHOLD_MS = 60 * 60 * 1000L;
+
+    /** Minimum interval between automatic cleanups (5 minutes). */
+    private static final long CLEANUP_INTERVAL_MS = 5 * 60 * 1000L;
+
+    private long lastCleanupAt = 0;
 
     private NickCache() {
     }
@@ -39,6 +50,22 @@ public final class NickCache {
     /** Drops everything remembered from the current server session. */
     public void clear() {
         nicks.clear();
+        lastCleanupAt = 0;
+    }
+
+    /** Entry with last-access timestamp for stale cleanup. */
+    private static final class CachedNick {
+        final PlayerContext player;
+        long lastAccessed;
+
+        CachedNick(PlayerContext player) {
+            this.player = player;
+            this.lastAccessed = System.currentTimeMillis();
+        }
+
+        void touch() {
+            this.lastAccessed = System.currentTimeMillis();
+        }
     }
 
     public void remember(String name) {
@@ -49,20 +76,22 @@ public final class NickCache {
 
         String key = name.toLowerCase();
 
-        if (nicks.containsKey(key)) {
+        CachedNick existing = nicks.get(key);
+        if (existing != null) {
+            existing.touch();
             return;
         }
 
         nicks.put(
                 key,
-                new PlayerContext(name, offlineUuid(name))
+                new CachedNick(new PlayerContext(name, offlineUuid(name)))
         );
 
-        if (nicks.size() > 600) {
-
-            String oldest = nicks.keySet().iterator().next();
-            nicks.remove(oldest);
+        if (nicks.size() > MAX_ENTRIES) {
+            evictOldest();
         }
+
+        maybeCleanup();
     }
 
     public void remember(PlayerContext player) {
@@ -99,9 +128,15 @@ public final class NickCache {
             return Optional.empty();
         }
 
-        return Optional.ofNullable(
-                nicks.get(name.trim().toLowerCase())
-        );
+        String key = name.trim().toLowerCase();
+        CachedNick cached = nicks.get(key);
+
+        if (cached != null) {
+            cached.touch();
+            return Optional.of(cached.player);
+        }
+
+        return Optional.empty();
     }
 
     /** Best nick that differs from the target by at most one edit. */
@@ -116,7 +151,7 @@ public final class NickCache {
         PlayerContext best = null;
         int bestDistance = Integer.MAX_VALUE;
 
-        for (Map.Entry<String, PlayerContext> entry :
+        for (Map.Entry<String, CachedNick> entry :
                 nicks.entrySet()) {
 
             String candidate = entry.getKey();
@@ -129,13 +164,22 @@ public final class NickCache {
 
             if (distance < bestDistance) {
                 bestDistance = distance;
-                best = entry.getValue();
+                best = entry.getValue().player;
             }
         }
 
-        return bestDistance <= 1
-                ? Optional.ofNullable(best)
-                : Optional.empty();
+        if (best != null && bestDistance <= 1) {
+            // Touch the matched entry
+            for (CachedNick cn : nicks.values()) {
+                if (cn.player.name().equalsIgnoreCase(best.name())) {
+                    cn.touch();
+                    break;
+                }
+            }
+            return Optional.of(best);
+        }
+
+        return Optional.empty();
     }
 
     /** All nicks that appear inside the text (longest first). */
@@ -149,12 +193,13 @@ public final class NickCache {
 
         String lower = text.toLowerCase();
 
-        for (PlayerContext player : nicks.values()) {
+        for (CachedNick cached : nicks.values()) {
 
-            String name = player.name().toLowerCase();
+            String name = cached.player.name().toLowerCase();
 
             if (containsWord(lower, name)) {
-                result.add(player);
+                cached.touch();
+                result.add(cached.player);
             }
         }
 
@@ -163,6 +208,34 @@ public final class NickCache {
         );
 
         return result;
+    }
+
+    /** Removes entries not accessed within the stale threshold. */
+    public void cleanupStaleEntries() {
+        long now = System.currentTimeMillis();
+        long cutoff = now - STALE_THRESHOLD_MS;
+
+        nicks.entrySet().removeIf(entry ->
+                entry.getValue().lastAccessed < cutoff
+        );
+
+        lastCleanupAt = now;
+    }
+
+    /** Triggers cleanup if enough time has passed since last cleanup. */
+    private void maybeCleanup() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupAt > CLEANUP_INTERVAL_MS) {
+            cleanupStaleEntries();
+        }
+    }
+
+    /** Evicts the oldest entry (LRU). */
+    private void evictOldest() {
+        if (!nicks.isEmpty()) {
+            String oldest = nicks.keySet().iterator().next();
+            nicks.remove(oldest);
+        }
     }
 
     private static boolean containsWord(String text, String name) {

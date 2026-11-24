@@ -11,19 +11,28 @@ import net.minecraft.text.Text;
 import java.util.function.Consumer;
 
 /**
- * Base screen for the mod UI: entrance animation, responsive centered form
- * and helpers to create custom themed widgets.
+ * Base screen for the mod UI: the launcher-style shell (icon rail, top
+ * bar, tab row), entrance animation and helpers to create themed
+ * widgets.
+ *
+ * <p>Subclasses draw their content inside the area reported by
+ * {@link #contentLeft()} / {@link #contentTop()} / {@link #contentWidth()},
+ * so every screen shares the same chrome and the same layout grid.
  */
 public abstract class StScreen extends Screen {
 
     private static final int MAX_FORM_WIDTH = 380;
 
-    // not final: screens that can be re-entered (via parent links)
-    // reset it in init() so the entrance animation replays
+    // not final: a screen may be revisited through a parent link
     protected long openTime =
             System.currentTimeMillis();
 
+    private boolean entranceNeedsStart = true;
+
     private int slotCounter;
+
+    /** Application shell shared by every screen. */
+    protected final StShell shell = new StShell();
 
     /**
      * Stagger counter for the widget entrance. It MUST be cleared on
@@ -45,9 +54,94 @@ public abstract class StScreen extends Screen {
     }
 
     protected float entrance() {
-        return Ui.easeOutCubic(Ui.clamp01(
-                (System.currentTimeMillis() - openTime) / 260f
-        ));
+
+        if (!Ui.animationsEnabled()) {
+            return 1f;
+        }
+
+        return Ui.easeOutCubic(
+                Ui.animationProgress(openTime, Design.DUR_ENTRANCE)
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // shell geometry
+    // ---------------------------------------------------------------
+
+    /** Left edge of the content area. */
+    protected int contentLeft() {
+        return shell.contentLeft();
+    }
+
+    /** Top edge of the content area. */
+    protected int contentTop() {
+        return shell.contentTop();
+    }
+
+    /** Width available to the content. */
+    protected int contentWidth() {
+        return shell.contentWidth();
+    }
+
+    /** Bottom edge of the content area. */
+    protected int contentBottom() {
+        return shell.contentBottom();
+    }
+
+    /**
+     * Configures the shell for this screen. Called from {@code init()}
+     * by every subclass, so the rail and tabs always reflect the current
+     * screen.
+     */
+    protected void configureShell() {
+
+        // the window rectangle must exist before any widget is placed
+        shell.layout();
+
+        shell.rail(
+                new StShell.RailItem(
+                        "\u26A1", "btn.macros", "hint.rail.macros",
+                        () -> client.setScreen(new MacroListScreen(this))),
+                new StShell.RailItem(
+                        "\uD83D\uDCCB", "btn.playerActions", "hint.rail.actions",
+                        () -> client.setScreen(new ActionsConfigScreen(this))),
+                new StShell.RailItem(
+                        "\uD83D\uDD52", "btn.history", "hint.rail.history",
+                        () -> client.setScreen(new ActionHistoryScreen(this))),
+                new StShell.RailItem(
+                        "\uD83D\uDC64", "btn.profiles", "hint.rail.profiles",
+                        () -> client.setScreen(new ProfilesScreen(this))),
+                new StShell.RailItem(
+                        "\uD83D\uDD0E", "btn.audit", "hint.rail.audit",
+                        () -> client.setScreen(new AuditScreen(this))),
+                new StShell.RailItem(
+                        "\u2699", "btn.settings", "hint.rail.settings",
+                        () -> client.setScreen(new SettingsScreen(this)))
+        );
+    }
+
+    /** Title shown in the top bar. */
+    protected String shellTitle() {
+        return "StaffTools";
+    }
+
+    /** Brand animation preset; subclasses can opt into a non-static style. */
+    protected int shellTitleAnimation() {
+        return 0;
+    }
+
+    /** Accent subtitle under the title (version, server, ...). */
+    protected String shellSubtitle() {
+        return "v" + net.fabricmc.loader.api.FabricLoader
+                .getInstance()
+                .getModContainer("stafftools")
+                .map(m -> m.getMetadata().getVersion().getFriendlyString())
+                .orElse("?");
+    }
+
+    /** Right-hand status pill text, or null to hide it. */
+    protected String shellStatus() {
+        return null;
     }
 
     protected int formWidth() {
@@ -151,13 +245,10 @@ public abstract class StScreen extends Screen {
             return;
         }
 
-        context.fillGradient(
-                0,
-                0,
-                width,
-                height,
-                0x90101216,
-                0xC410141A
+        // the shell paints the whole window background itself
+        context.fill(
+                0, 0, width, height,
+                Ui.argb(Ui.BG, 1f)
         );
     }
 
@@ -169,10 +260,15 @@ public abstract class StScreen extends Screen {
             float delta
     ) {
 
+        if (entranceNeedsStart) {
+            openTime = System.currentTimeMillis();
+            entranceNeedsStart = false;
+        }
+
         float alpha = entrance();
 
-        // static: the darkened backdrop must NOT animate,
-        // otherwise it slides and leaves a gap at the top
+        // static: the backdrop must NOT animate, otherwise it slides
+        // and leaves a gap at the top
         renderBackground(
                 context,
                 mouseX,
@@ -180,11 +276,25 @@ public abstract class StScreen extends Screen {
                 delta
         );
 
+        // chrome is drawn outside the entrance matrix so the rail and
+        // top bar never slide
+        shell.render(
+                context,
+                mouseX,
+                mouseY,
+                alpha,
+                shellTitle(),
+                shellSubtitle(),
+                shellStatus(),
+                shellTitleAnimation(),
+                delta
+        );
+
         context.getMatrices().pushMatrix();
 
         context.getMatrices().translate(
                 0,
-                (1 - alpha) * 14
+                (1 - alpha) * 8
         );
 
         renderTheme(
@@ -218,6 +328,34 @@ public abstract class StScreen extends Screen {
         );
 
         context.getMatrices().popMatrix();
+
+        // the shell tooltip floats above everything, including widgets
+        shell.renderTooltip(context, alpha);
+    }
+
+    @Override
+    public void removed() {
+        entranceNeedsStart = true;
+        super.removed();
+    }
+
+    @Override
+    public boolean mouseClicked(
+            net.minecraft.client.gui.Click click,
+            boolean doubled
+    ) {
+
+        // the shell chrome sits above the content and gets the click first
+        if (shell.mouseClicked(
+                click.x(),
+                click.y(),
+                click.button()
+        )) {
+
+            return true;
+        }
+
+        return super.mouseClicked(click, doubled);
     }
 
     /** Draws titles, labels, rows and other custom content. */
@@ -254,11 +392,16 @@ public abstract class StScreen extends Screen {
                 Ui.argb(Ui.TEXT, alpha)
         );
 
-        Ui.drawHeader(
+        // accent underline: a short gradient bar instead of a flat line,
+        // so every screen shares the same header language
+        Ui.drawGradientH(
                 context,
                 width / 2 - 55,
                 27,
                 110,
+                2,
+                Ui.ACCENT,
+                Ui.ACCENT_2,
                 alpha
         );
     }

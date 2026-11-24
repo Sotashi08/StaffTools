@@ -8,11 +8,8 @@ import com.uwdie.stafftools.client.player.PlayerContext;
  * @param highlight whether the range may be recoloured. A nick found
  *                  through the real account name is repainted in the
  *                  mod's colour so it stands out in a wall of text,
- *                  while a nick that is only known through a changed
- *                  /nick is a normal word of somebody's message:
- *                  repainting it would turn arbitrary words of the
- *                  chat yellow, so those keep the server's colour and
- *                  only become clickable.
+ *                  while the global nick-highlighting setting can
+ *                  remove that repaint. Either kind of mention remains clickable.
  */
 public record PlayerMention(
         PlayerContext player,

@@ -62,10 +62,10 @@ public class StTextField extends TextFieldWidget {
             float delta
     ) {
 
-        long now = System.currentTimeMillis();
-
-        float alpha = Ui.clamp01(
-                (now - appear - slot * 28L) / 190f
+        float alpha = Ui.entranceProgress(
+                appear,
+                slot * 16L,
+                210L
         );
 
         if (alpha <= 0.001f) {
@@ -74,8 +74,12 @@ public class StTextField extends TextFieldWidget {
 
         float target = isFocused() ? 1f : 0f;
 
-        focusAmt += (target - focusAmt) *
-                Math.min(1f, delta * 12f);
+        focusAmt = Ui.animateTowards(
+                focusAmt,
+                target,
+                delta,
+                12f
+        );
 
         int x = getX();
         int y = getY();
@@ -109,6 +113,15 @@ public class StTextField extends TextFieldWidget {
                 h,
                 3,
                 Ui.argb(bg, alpha)
+        );
+
+        Ui.drawHoverGlow(
+                context,
+                x, y, w, h,
+                3,
+                Ui.ACCENT,
+                focusAmt,
+                alpha
         );
 
         Ui.drawRoundBorder(

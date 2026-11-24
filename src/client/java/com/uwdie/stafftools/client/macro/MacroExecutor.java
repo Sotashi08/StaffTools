@@ -1,5 +1,8 @@
 package com.uwdie.stafftools.client.macro;
 
+import com.uwdie.stafftools.client.audit.AuditCategory;
+import com.uwdie.stafftools.client.audit.AuditLog;
+import com.uwdie.stafftools.client.audit.Profiler;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.punishment.PunishmentHistory;
 import com.uwdie.stafftools.client.punishment.PunishmentRecord;
@@ -22,8 +25,16 @@ public final class MacroExecutor {
             PlayerContext target
     ) {
 
-        if (macro == null ||
-                !macro.isEnabled()) {
+        if (macro == null) {
+            return;
+        }
+
+        if (!macro.isEnabled()) {
+
+            AuditLog.get().warn(
+                    AuditCategory.MACRO,
+                    "Macro skipped (disabled): " + macro.getName()
+            );
 
             return;
         }
@@ -32,7 +43,8 @@ public final class MacroExecutor {
                 macro.getCommands(),
                 target,
                 macro.getName(),
-                SourceKind.MACRO
+                SourceKind.MACRO,
+                null
         );
     }
 
@@ -76,20 +88,32 @@ public final class MacroExecutor {
             String alias
     ) {
 
-        if (macro == null ||
-                !macro.isEnabled()) {
+        if (macro == null) {
+            return;
+        }
+
+        if (!macro.isEnabled()) {
+
+            AuditLog.get().warn(
+                    AuditCategory.MACRO,
+                    "Macro skipped (disabled): " + macro.getName()
+            );
 
             return;
         }
 
+        // Sanitize alias before use
+        String safeAlias = MacroValidator.sanitizeAlias(alias);
+
         executeCommands(
                 substituteAlias(
                         macro.getCommands(),
-                        alias
+                        safeAlias
                 ),
                 target,
                 macro.getName(),
-                SourceKind.MACRO
+                SourceKind.MACRO,
+                safeAlias
         );
     }
 
@@ -104,7 +128,8 @@ public final class MacroExecutor {
                 List.of(command == null ? "" : command),
                 target,
                 actionLabel,
-                SourceKind.ACTION
+                SourceKind.ACTION,
+                null
         );
     }
 
@@ -116,14 +141,18 @@ public final class MacroExecutor {
             String actionLabel
     ) {
 
+        // Sanitize alias before use
+        String safeAlias = MacroValidator.sanitizeAlias(alias);
+
         executeCommands(
                 substituteAlias(
                         List.of(command == null ? "" : command),
-                        alias
+                        safeAlias
                 ),
                 target,
                 actionLabel,
-                SourceKind.ACTION
+                SourceKind.ACTION,
+                safeAlias
         );
     }
 
@@ -164,7 +193,8 @@ public final class MacroExecutor {
                 rawCommands,
                 target,
                 null,
-                SourceKind.MANUAL
+                SourceKind.MANUAL,
+                null
         );
     }
 
@@ -172,12 +202,15 @@ public final class MacroExecutor {
      * {@code sourceName} / {@code sourceKind} are recorded on every
      * punishment the commands produce, so the history can tell macros
      * and actions apart.
+     *
+     * @param aliasUsed the alias that was substituted (if any), for validation
      */
     public static void executeCommands(
             List<String> rawCommands,
             PlayerContext target,
             String sourceName,
-            SourceKind sourceKind
+            SourceKind sourceKind,
+            String aliasUsed
     ) {
 
         MinecraftClient client =
@@ -186,14 +219,24 @@ public final class MacroExecutor {
         if (client.player == null ||
                 client.getNetworkHandler() == null) {
 
+            AuditLog.get().warn(
+                    AuditCategory.MACRO,
+                    "Execution aborted (not in a world): "
+                            + describe(sourceName, sourceKind)
+            );
+
             return;
         }
+
+        long startedAt = System.nanoTime();
 
         PunishmentHistory.get()
                 .setPendingSource(sourceName, sourceKind);
 
         MacroContext context =
                 MacroContext.create(target);
+
+        List<String> resolvedCommands = new ArrayList<>();
 
         for (String raw :
                 rawCommands) {
@@ -214,14 +257,67 @@ public final class MacroExecutor {
                 continue;
             }
 
-            if (command.startsWith("/")) {
-
-                command =
-                        command.substring(1);
-            }
-
-            client.getNetworkHandler()
-                    .sendChatCommand(command);
+            resolvedCommands.add(command);
         }
+
+        // Validate all resolved commands before execution (commands still have leading /)
+        MacroValidator.ValidationResult validation =
+                MacroValidator.validateCommands(
+                        resolvedCommands,
+                        target,
+                        aliasUsed
+                );
+
+        if (!validation.isSuccess()) {
+
+            AuditLog.get().error(
+                    AuditCategory.MACRO,
+                    "Validation failed for "
+                            + describe(sourceName, sourceKind)
+                            + ": " + validation.getMessage()
+            );
+
+            return;
+        }
+
+        // Execute validated commands (strip leading / for sendChatCommand)
+        for (String command : resolvedCommands) {
+            String toSend = command;
+            if (toSend.startsWith("/")) {
+                toSend = toSend.substring(1);
+            }
+            client.getNetworkHandler()
+                    .sendChatCommand(toSend);
+        }
+
+        Profiler.get().record(
+                Profiler.MACRO_EXEC,
+                System.nanoTime() - startedAt
+        );
+
+        AuditLog.get().success(
+                AuditCategory.MACRO,
+                "Ran " + describe(sourceName, sourceKind)
+                        + (target == null ? "" : " -> " + target.name())
+                        + (aliasUsed == null || aliasUsed.isBlank()
+                        ? ""
+                        : " [" + aliasUsed + "]")
+                        + ": " + String.join(" | ", resolvedCommands)
+        );
+    }
+
+    /** Human readable source label for the audit journal. */
+    private static String describe(
+            String sourceName,
+            SourceKind sourceKind
+    ) {
+
+        String kind = sourceKind == null
+                ? "command"
+                : sourceKind.name().toLowerCase();
+
+        return sourceName == null || sourceName.isBlank()
+                ? kind
+                : kind + " '" + sourceName + "'";
     }
 }

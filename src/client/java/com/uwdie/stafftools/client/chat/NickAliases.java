@@ -18,9 +18,35 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class NickAliases {
 
+    /** Maximum entries before LRU eviction. */
+    private static final int MAX_ENTRIES = 500;
 
-    private static final Map<String, PlayerContext> ALIASES =
+    /** Entries not accessed for this long are considered stale (1 hour). */
+    private static final long STALE_THRESHOLD_MS = 60 * 60 * 1000L;
+
+    /** Minimum interval between automatic cleanups (5 minutes). */
+    private static final long CLEANUP_INTERVAL_MS = 5 * 60 * 1000L;
+
+    /** alias (lower case) -> tracked entry with last-access timestamp */
+    private static final Map<String, TrackedAlias> ALIASES =
             new ConcurrentHashMap<>();
+
+    private static long lastCleanupAt = 0;
+
+    /** Entry with last-access timestamp for stale cleanup. */
+    private static final class TrackedAlias {
+        final PlayerContext player;
+        long lastAccessed;
+
+        TrackedAlias(PlayerContext player) {
+            this.player = player;
+            this.lastAccessed = System.currentTimeMillis();
+        }
+
+        void touch() {
+            this.lastAccessed = System.currentTimeMillis();
+        }
+    }
 
     private NickAliases() {
     }
@@ -62,13 +88,18 @@ public final class NickAliases {
                 continue;
             }
 
-            if (ALIASES.size() >= 500 &&
-                    !ALIASES.containsKey(lower)) {
-
+            TrackedAlias existing = ALIASES.get(lower);
+            if (existing != null) {
+                existing.touch();
                 continue;
             }
 
-            ALIASES.put(lower, player);
+            if (ALIASES.size() >= MAX_ENTRIES) {
+                evictOldest();
+            }
+
+            ALIASES.put(lower, new TrackedAlias(player));
+            maybeCleanup();
         }
     }
 
@@ -81,9 +112,15 @@ public final class NickAliases {
             return java.util.Optional.empty();
         }
 
-        return java.util.Optional.ofNullable(
-                ALIASES.get(alias.trim().toLowerCase())
-        );
+        String key = alias.trim().toLowerCase();
+        TrackedAlias tracked = ALIASES.get(key);
+
+        if (tracked != null) {
+            tracked.touch();
+            return java.util.Optional.of(tracked.player);
+        }
+
+        return java.util.Optional.empty();
     }
 
     /** Finds learned alias occurrences in arbitrary text. */
@@ -96,7 +133,7 @@ public final class NickAliases {
 
         String lower = message.toLowerCase();
 
-        for (Map.Entry<String, PlayerContext> e :
+        for (Map.Entry<String, TrackedAlias> e :
                 ALIASES.entrySet()) {
 
             String alias = e.getKey();
@@ -117,9 +154,10 @@ public final class NickAliases {
 
                 if (left && right) {
 
+                    e.getValue().touch();
                     result.add(
                             new PlayerMention(
-                                    e.getValue(),
+                                    e.getValue().player,
                                     index,
                                     index + alias.length()
                             )
@@ -131,6 +169,34 @@ public final class NickAliases {
         }
 
         return result;
+    }
+
+    /** Removes entries not accessed within the stale threshold. */
+    public static void cleanupStaleEntries() {
+        long now = System.currentTimeMillis();
+        long cutoff = now - STALE_THRESHOLD_MS;
+
+        ALIASES.entrySet().removeIf(entry ->
+                entry.getValue().lastAccessed < cutoff
+        );
+
+        lastCleanupAt = now;
+    }
+
+    /** Triggers cleanup if enough time has passed since last cleanup. */
+    private static void maybeCleanup() {
+        long now = System.currentTimeMillis();
+        if (now - lastCleanupAt > CLEANUP_INTERVAL_MS) {
+            cleanupStaleEntries();
+        }
+    }
+
+    /** Evicts the oldest entry (LRU). */
+    private static void evictOldest() {
+        if (!ALIASES.isEmpty()) {
+            String oldest = ALIASES.keySet().iterator().next();
+            ALIASES.remove(oldest);
+        }
     }
 
     private static boolean isNameChar(char c) {

@@ -32,11 +32,11 @@ import java.util.List;
 public class ProfileEditScreen extends StScreen {
 
     private static final int PAD = 10;
-    private static final int NAME_Y = 62;
-    private static final int THEME_LABEL_Y = 92;
-    private static final int THEME_Y = 104;
-    private static final int HDR_Y = 134;
-    private static final int LIST_TOP = 146;
+    private int NAME_Y;
+    private int THEME_LABEL_Y;
+    private int THEME_Y;
+    private int HDR_Y;
+    private int LIST_TOP;
     private static final int ENTRY_H = 14;
     private static final int ENTRY_GAP = 2;
     private static final int COL_GAP = 10;
@@ -58,7 +58,9 @@ public class ProfileEditScreen extends StScreen {
     private float scrollVel;
 
     private int panelLeft;
+    private int panelTop;
     private int panelWidth;
+    private int panelHeight;
     private int listBottom;
     private int colW;
     private int col2X;
@@ -82,18 +84,45 @@ public class ProfileEditScreen extends StScreen {
 
         clearChildren();
 
+        configureShell();
+
         StaffToolsConfig config = StafftoolsClient.getConfig();
         Profile profile = config.findProfile(profileId);
 
-        panelWidth = Math.min(320, formWidth());
-        panelLeft = (width - panelWidth) / 2;
+        buildColumns(profile);
+
+        int availableTop = contentTop() + 28;
+        int availableBottom = contentBottom() - 8;
+        int availableHeight = Math.max(1, availableBottom - availableTop);
+        panelWidth = Math.max(
+                1,
+                Math.min(420, contentWidth() - 24)
+        );
+        panelLeft = contentLeft() + (contentWidth() - panelWidth) / 2;
+
+        int rows = Math.max(macroLines.size(), actionLines.size());
+        int desiredHeight = 168 + Math.min(
+                rows * (ENTRY_H + ENTRY_GAP),
+                160
+        );
+        panelHeight = Math.min(
+                availableHeight,
+                Math.max(Math.min(availableHeight, 220), desiredHeight)
+        );
+        panelTop = availableTop + (availableHeight - panelHeight) / 2;
 
         int inner = panelWidth - PAD * 2;
 
         colW = (inner - COL_GAP) / 2;
         col2X = panelLeft + PAD + colW + COL_GAP;
 
-        listBottom = height - 44;
+        listBottom = panelTop + panelHeight - 42;
+
+        NAME_Y = panelTop + 28;
+        THEME_LABEL_Y = NAME_Y + 30;
+        THEME_Y = THEME_LABEL_Y + 12;
+        HDR_Y = THEME_Y + 30;
+        LIST_TOP = HDR_Y + 12;
 
         nameField = new StTextField(
                 textRenderer,
@@ -113,17 +142,16 @@ public class ProfileEditScreen extends StScreen {
 
         addDrawableChild(nameField);
 
-        buildColumns(profile);
-
         scroll = Math.min(scroll, maxScroll());
         scrollPos = scroll;
         scrollVel = 0f;
 
         int half = (inner - 8) / 2;
+        int buttonY = panelTop + panelHeight - 32;
 
         button(
                 panelLeft + PAD,
-                height - 32,
+                buttonY,
                 half,
                 22,
                 Key.BTN_PROFILE_SAVE,
@@ -132,7 +160,7 @@ public class ProfileEditScreen extends StScreen {
 
         button(
                 panelLeft + PAD + half + 8,
-                height - 32,
+                buttonY,
                 half,
                 22,
                 Key.BTN_BACK,
@@ -310,6 +338,18 @@ public class ProfileEditScreen extends StScreen {
             double verticalAmount
     ) {
 
+        if (mouseX < panelLeft + PAD ||
+                mouseX >= panelLeft + panelWidth - PAD ||
+                mouseY < LIST_TOP ||
+                mouseY >= listBottom) {
+            return super.mouseScrolled(
+                    mouseX,
+                    mouseY,
+                    horizontalAmount,
+                    verticalAmount
+            );
+        }
+
         scroll += verticalAmount > 0
                 ? -(ENTRY_H + ENTRY_GAP)
                 : (ENTRY_H + ENTRY_GAP);
@@ -319,8 +359,16 @@ public class ProfileEditScreen extends StScreen {
 
     private void updateScroll(float delta) {
 
-        float step = Ui.clamp01(delta) * 0.05f;
         float max = maxScroll();
+        if (!Ui.animationsEnabled()) {
+            scroll = Math.clamp(scroll, 0f, max);
+            scrollPos = scroll;
+            scrollVel = 0f;
+            return;
+        }
+
+        float step = Ui.clamp01(delta) * 0.05f
+                * Ui.animationSpeed();
 
         float target = Math.clamp(
                 scroll,
@@ -368,7 +416,16 @@ public class ProfileEditScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.TITLE_PROFILE_EDIT, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDC64",
+                Lang.t(Key.TITLE_PROFILE_EDIT),
+                Lang.t(Key.MSG_PROFILES_HINT),
+                alpha
+        );
 
         StaffToolsConfig config = StafftoolsClient.getConfig();
         Profile profile = config.findProfile(profileId);
@@ -377,17 +434,17 @@ public class ProfileEditScreen extends StScreen {
         Ui.drawPanel(
                 context,
                 panelLeft,
-                34,
+                panelTop,
                 panelWidth,
-                height - 34 - 26,
+                panelHeight,
                 alpha
         );
         Ui.drawOrbitFrame(
                 context,
                 panelLeft,
-                34,
+                panelTop,
                 panelWidth,
-                height - 34 - 26,
+                panelHeight,
                 alpha
         );
 
@@ -480,17 +537,61 @@ public class ProfileEditScreen extends StScreen {
         context.drawCenteredTextWithShadow(
                 textRenderer,
                 Text.literal(Lang.t(Theme.nameKey(activeTheme))),
-                width / 2,
+                panelLeft + panelWidth / 2,
                 THEME_Y + 22,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
+        );
+
+        int columnTop = HDR_Y - 4;
+        int columnHeight = Math.max(1, listBottom - columnTop);
+        int firstColumnX = panelLeft + PAD;
+
+        Ui.drawRoundRect(
+                context,
+                firstColumnX,
+                columnTop,
+                colW,
+                columnHeight,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.PANEL_BG_SOFT, alpha)
+        );
+        Ui.drawRoundBorder(
+                context,
+                firstColumnX,
+                columnTop,
+                colW,
+                columnHeight,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.PANEL_BORDER, alpha * 0.8f)
+        );
+        Ui.drawRoundRect(
+                context,
+                col2X,
+                columnTop,
+                colW,
+                columnHeight,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.PANEL_BG_SOFT, alpha)
+        );
+        Ui.drawRoundBorder(
+                context,
+                col2X,
+                columnTop,
+                colW,
+                columnHeight,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.PANEL_BORDER, alpha * 0.8f)
         );
 
         // column headers
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
-                        Lang.t(Key.MSG_PROFILE_MACROS) +
-                                " (" + macroLines.size() + ")"
+                        textRenderer.trimToWidth(
+                                Lang.t(Key.MSG_PROFILE_MACROS) +
+                                        " (" + macroLines.size() + ")",
+                                Math.max(0, colW - 12)
+                        )
                 ),
                 panelLeft + PAD,
                 HDR_Y,
@@ -500,8 +601,11 @@ public class ProfileEditScreen extends StScreen {
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
-                        Lang.t(Key.MSG_PROFILE_ACTIONS) +
-                                " (" + actionLines.size() + ")"
+                        textRenderer.trimToWidth(
+                                Lang.t(Key.MSG_PROFILE_ACTIONS) +
+                                        " (" + actionLines.size() + ")",
+                                Math.max(0, colW - 12)
+                        )
                 ),
                 col2X,
                 HDR_Y,
@@ -509,9 +613,16 @@ public class ProfileEditScreen extends StScreen {
         );
 
         context.fill(
-                panelLeft + PAD,
+                firstColumnX,
                 HDR_Y + 10,
-                panelLeft + panelWidth - PAD,
+                firstColumnX + colW,
+                HDR_Y + 11,
+                Ui.argb(0x2C3B55, alpha)
+        );
+        context.fill(
+                col2X,
+                HDR_Y + 10,
+                col2X + colW,
                 HDR_Y + 11,
                 Ui.argb(0x2C3B55, alpha)
         );
@@ -521,7 +632,7 @@ public class ProfileEditScreen extends StScreen {
             context.drawCenteredTextWithShadow(
                     textRenderer,
                     Lang.text(Key.MSG_PROFILE_NONE),
-                    width / 2,
+                    panelLeft + panelWidth / 2,
                     LIST_TOP + 20,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
             );
@@ -535,18 +646,15 @@ public class ProfileEditScreen extends StScreen {
 
         // one clip box for both columns
         context.enableScissor(
-                panelLeft + PAD,
+                firstColumnX,
                 LIST_TOP,
                 panelLeft + panelWidth - PAD,
                 listBottom
         );
 
-        long now = System.currentTimeMillis();
-
         drawColumn(
                 context,
-                now,
-                panelLeft + PAD,
+                firstColumnX,
                 macroLines,
                 macroDims,
                 alpha,
@@ -555,7 +663,6 @@ public class ProfileEditScreen extends StScreen {
 
         drawColumn(
                 context,
-                now,
                 col2X,
                 actionLines,
                 actionDims,
@@ -570,7 +677,6 @@ public class ProfileEditScreen extends StScreen {
 
     private void drawColumn(
             DrawContext context,
-            long now,
             int x,
             List<String> lines,
             List<Boolean> dims,
@@ -587,9 +693,10 @@ public class ProfileEditScreen extends StScreen {
                 continue;
             }
 
-            float appear = Ui.clamp01(
-                    (now - openTime
-                            - (i + staggerOffset) * 14L) / 160f
+            float appear = Ui.entranceProgress(
+                    openTime,
+                    (i + staggerOffset) * 14L,
+                    210L
             );
 
             if (appear <= 0.01f) {

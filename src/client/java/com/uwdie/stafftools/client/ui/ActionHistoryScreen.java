@@ -32,7 +32,8 @@ public class ActionHistoryScreen extends StScreen {
     private static final int ROW_GAP = 3;
 
     /** Narrow server list, pinned to the left edge. */
-    private static final int SIDE_X = 8;
+    /** Sidebar is anchored to the content area, not the screen edge. */
+    private int SIDE_X;
     private static final int SIDE_W = 104;
     private static final int SIDE_TOP = 34;
     private static final int SIDE_ROW_H = 15;
@@ -40,18 +41,14 @@ public class ActionHistoryScreen extends StScreen {
     private static final int SIDE_BOTTOM_PAD = 36;
 
     /** Summary block. */
-    private static final int PANEL_Y = 34;
     private static final int STATS_H = 76;
     private static final int STATS_PAD = 10;
 
     /** Filter bar. */
-    private static final int FILTER_Y = 116;
     private static final int FILTER_H = 20;
 
     /** Table. */
-    private static final int TABLE_TOP = 152;
     private static final int HEADER_H = 11;
-    private static final int BOTTOM_PAD = 40;
 
     /** Dropdown menus. */
     private static final int MENU_NONE = 0;
@@ -63,6 +60,15 @@ public class ActionHistoryScreen extends StScreen {
 
     /** Sentinel key of the shared journal entry. */
     private static final String ALL_SERVERS = "\0all";
+
+    /** Vertical anchors, resolved against the shell content area. */
+    private int panelY;
+    private int filterY;
+    private int filterBarHeight;
+    private int filterChipW;
+    private int fieldY;
+    private int resetY;
+    private int tableTop;
 
     private final Screen parent;
 
@@ -77,6 +83,7 @@ public class ActionHistoryScreen extends StScreen {
     /** Centered main area. */
     private int contentLeft;
     private int contentWidth;
+    private int tableContentWidth;
 
     /** Relative column offsets, resolved against contentWidth. */
     private int colType;
@@ -117,29 +124,64 @@ public class ActionHistoryScreen extends StScreen {
 
         resetSlots();
 
-        // the sidebar stays on the left, everything else is centered in
-        // the space that is left
-        int free = width - (SIDE_X + SIDE_W) - 24;
+        configureShell();
 
-        contentWidth = Math.max(180, Math.min(free, 430));
-        contentLeft = (width - contentWidth) / 2;
+        // the sidebar stays on the left of the content area, everything
+        // else fills the space that is left
+        SIDE_X = contentLeft();
 
-        colType = 40;
-        colPlayer = contentWidth * 38 / 100;
-        colStatus = contentWidth * 66 / 100;
-        colServer = contentWidth * 84 / 100;
+        int free = contentWidth() - (SIDE_W + 12);
 
-        tableBottom = height - BOTTOM_PAD;
+        int mainWidth = Math.max(1, Math.min(free, 560));
+        int mainLeft = contentLeft() + SIDE_W + 12;
+
+        contentWidth = mainWidth;
+        tableContentWidth = Math.max(1, contentWidth - 6);
+        contentLeft = mainLeft;
+
+        // the section title sits above the panels, so everything starts
+        // one title-height lower
+        panelY = contentTop() + 34;
+        filterY = panelY + STATS_H + 6;
+        filterChipW = contentWidth >= 360
+                ? 96
+                : Math.max(32, (contentWidth - 8) / 2);
+        filterBarHeight = contentWidth >= 360
+                ? FILTER_H
+                : FILTER_H * 2 + 4;
+        resetY = contentWidth >= 360
+                ? filterY
+                : filterY + FILTER_H + 4;
+        tableTop = filterY + filterBarHeight + 14;
+
+        colType = tableContentWidth * 17 / 100;
+        colPlayer = tableContentWidth * 38 / 100;
+        colStatus = tableContentWidth * 61 / 100;
+        colServer = tableContentWidth * 80 / 100;
+
+        tableBottom = contentBottom() - 34;
+        tableTop = Math.min(
+                tableTop,
+                tableBottom - HEADER_H - 8
+        );
 
         resetX = contentLeft + contentWidth - 52;
 
-        int fieldX = contentLeft + 204;
-        int fieldW = Math.max(60, resetX - fieldX - 6);
+        int fieldX = contentWidth >= 360
+                ? contentLeft + 204
+                : contentLeft;
+        int fieldW = Math.max(
+                1,
+                resetX - fieldX - 6
+        );
+        fieldY = contentWidth >= 360
+                ? filterY
+                : resetY;
 
         StTextField field = new StTextField(
                 textRenderer,
                 fieldX,
-                FILTER_Y,
+                fieldY,
                 fieldW,
                 FILTER_H,
                 Text.literal(Lang.t(Key.HIST_FILTER_NICK_HINT)),
@@ -167,7 +209,7 @@ public class ActionHistoryScreen extends StScreen {
 
         button(
                 contentLeft,
-                height - 32,
+                contentBottom() - 26,
                 half,
                 22,
                 Key.BTN_BACK,
@@ -180,7 +222,7 @@ public class ActionHistoryScreen extends StScreen {
 
         button(
                 contentLeft + half + 8,
-                height - 32,
+                contentBottom() - 26,
                 contentWidth - half - 8,
                 22,
                 serverKey == null
@@ -225,6 +267,19 @@ public class ActionHistoryScreen extends StScreen {
             return true;
         }
 
+        if (mouseX < contentLeft ||
+                mouseX >= contentLeft + contentWidth ||
+                mouseY < tableTop ||
+                mouseY >= tableBottom) {
+
+            return super.mouseScrolled(
+                    mouseX,
+                    mouseY,
+                    horizontalAmount,
+                    verticalAmount
+            );
+        }
+
         int step = ROW_H + ROW_GAP;
 
         scroll = clampScroll(
@@ -247,12 +302,12 @@ public class ActionHistoryScreen extends StScreen {
 
     private int sideTop() {
 
-        return SIDE_TOP + 18;
+        return contentTop() + 52;
     }
 
     private int sideBottom() {
 
-        return height - SIDE_BOTTOM_PAD;
+        return contentBottom() - 34;
     }
 
     private int sideViewport() {
@@ -281,7 +336,7 @@ public class ActionHistoryScreen extends StScreen {
 
         return Math.max(
                 0,
-                contentHeight - (tableBottom - TABLE_TOP)
+                contentHeight - (tableBottom - tableTop)
         );
     }
 
@@ -292,8 +347,8 @@ public class ActionHistoryScreen extends StScreen {
 
         return mouseX >= SIDE_X &&
                 mouseX < SIDE_X + SIDE_W &&
-                mouseY >= SIDE_TOP &&
-                mouseY <= height - SIDE_BOTTOM_PAD;
+                mouseY >= contentTop() &&
+                mouseY <= contentBottom() - 34;
     }
 
     // ------------------------------------------------------------------
@@ -502,7 +557,7 @@ public class ActionHistoryScreen extends StScreen {
     }
 
     private int statusMenuX() {
-        return contentLeft + 104;
+        return contentLeft + filterChipW + 8;
     }
 
     private boolean chipHover(
@@ -512,9 +567,9 @@ public class ActionHistoryScreen extends StScreen {
     ) {
 
         return mouseX >= x &&
-                mouseX < x + 96 &&
-                mouseY >= FILTER_Y &&
-                mouseY <= FILTER_Y + FILTER_H;
+                mouseX < x + filterChipW &&
+                mouseY >= filterY &&
+                mouseY <= filterY + FILTER_H;
     }
 
     private boolean clickChip(
@@ -552,8 +607,8 @@ public class ActionHistoryScreen extends StScreen {
             double mouseY
     ) {
 
-        return mouseY >= FILTER_Y &&
-                mouseY <= FILTER_Y + FILTER_H &&
+        return mouseY >= filterY &&
+                mouseY <= filterY + filterBarHeight &&
                 mouseX >= contentLeft &&
                 mouseX <= contentLeft + contentWidth;
     }
@@ -568,7 +623,9 @@ public class ActionHistoryScreen extends StScreen {
             return false;
         }
 
-        if (mouseX < resetX || mouseX > resetX + 52) {
+        if (mouseX < resetX || mouseX > resetX + 52 ||
+                mouseY < resetY ||
+                mouseY > resetY + FILTER_H) {
             return false;
         }
 
@@ -596,10 +653,21 @@ public class ActionHistoryScreen extends StScreen {
                 ? PunishmentType.values().length + 1
                 : PunishmentStatus.values().length + 1;
 
-        int y = FILTER_Y + FILTER_H + 1;
         int h = items * ITEM_H + 4;
+        int y = Math.min(
+                filterY + FILTER_H + 1,
+                contentBottom() - h - 4
+        );
+        y = Math.max(contentTop() + 4, y);
+        int w = Math.max(
+                1,
+                Math.min(
+                        MENU_W,
+                        contentLeft + contentWidth - x
+                )
+        );
 
-        return new int[]{x, y, MENU_W, h};
+        return new int[]{x, y, w, h};
     }
 
     private int menuItemAt(
@@ -614,9 +682,9 @@ public class ActionHistoryScreen extends StScreen {
         int[] box = menuBox();
 
         if (mouseX < box[0] ||
-                mouseX > box[0] + box[2] ||
+                mouseX >= box[0] + box[2] ||
                 mouseY < box[1] + 2 ||
-                mouseY > box[1] + box[3]) {
+                mouseY >= box[1] + box[3]) {
 
             return -1;
         }
@@ -764,16 +832,16 @@ public class ActionHistoryScreen extends StScreen {
     ) {
 
         if (mouseX < contentLeft ||
-                mouseX > contentLeft + contentWidth ||
-                mouseY < TABLE_TOP ||
-                mouseY > tableBottom) {
+                mouseX >= contentLeft + contentWidth ||
+                mouseY < tableTop ||
+                mouseY >= tableBottom) {
 
             return null;
         }
 
         List<PunishmentRecord> records = visible();
 
-        int y = TABLE_TOP - scroll;
+        int y = tableTop - scroll;
 
         for (int i = 0; i < records.size(); i++) {
 
@@ -822,7 +890,16 @@ public class ActionHistoryScreen extends StScreen {
             float alpha
     ) {
 
-        drawTitle(context, Key.HISTORY_TITLE, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\uD83D\uDD52",
+                Lang.t(Key.HISTORY_TITLE),
+                Lang.t(Key.MSG_HISTORY_HINT),
+                alpha
+        );
 
         stats = HistoryStats.of(visible());
 
@@ -920,8 +997,8 @@ public class ActionHistoryScreen extends StScreen {
             float alpha
     ) {
 
-        int top = SIDE_TOP;
-        int h = height - SIDE_BOTTOM_PAD - top;
+        int top = contentTop() + 34;
+        int h = contentBottom() - 34 - top;
 
         Ui.drawPanel(context, SIDE_X, top, SIDE_W, h, alpha);
 
@@ -980,31 +1057,42 @@ public class ActionHistoryScreen extends StScreen {
         boolean over = hovered != null &&
                 hovered.key().equals(row.key());
 
-        int fill = row.selected()
-                ? Ui.argb(0x30ACC2F0, alpha)
-                : over
-                        ? Ui.argb(0x1AFFFFFF, alpha)
-                        : 0;
-
-        if (fill != 0) {
-
-            context.fill(
-                    SIDE_X + 3,
-                    y,
-                    SIDE_X + SIDE_W - 3,
-                    y + SIDE_ROW_H,
-                    fill
-            );
-        }
-
         if (row.selected()) {
 
-            context.fill(
+            Ui.drawRoundRect(
+                    context,
                     SIDE_X + 3,
                     y,
+                    SIDE_W - 6,
+                    SIDE_ROW_H,
+                    Design.RADIUS_SM,
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.22f),
+                            alpha
+                    )
+            );
+
+            context.fill(
+                    SIDE_X + 3,
+                    y + 2,
                     SIDE_X + 5,
-                    y + SIDE_ROW_H,
+                    y + SIDE_ROW_H - 2,
                     Ui.argb(Ui.ACCENT, alpha)
+            );
+
+        } else if (over) {
+
+            Ui.drawRoundRect(
+                    context,
+                    SIDE_X + 3,
+                    y,
+                    SIDE_W - 6,
+                    SIDE_ROW_H,
+                    Design.RADIUS_SM,
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.06f),
+                            alpha
+                    )
             );
         }
 
@@ -1119,7 +1207,7 @@ public class ActionHistoryScreen extends StScreen {
         Ui.drawPanel(
                 context,
                 contentLeft,
-                PANEL_Y,
+                panelY,
                 contentWidth,
                 STATS_H,
                 alpha
@@ -1128,7 +1216,7 @@ public class ActionHistoryScreen extends StScreen {
         Ui.drawOrbitFrame(
                 context,
                 contentLeft,
-                PANEL_Y,
+                panelY,
                 contentWidth,
                 STATS_H,
                 alpha
@@ -1146,7 +1234,7 @@ public class ActionHistoryScreen extends StScreen {
                 stats.getUnanswered(), Ui.TEXT_DIM, alpha);
 
         int x = contentLeft + STATS_PAD;
-        int lineY = PANEL_Y + 40;
+        int lineY = panelY + 40;
 
 
         drawLine(context, x, lineY, alpha,
@@ -1234,34 +1322,37 @@ public class ActionHistoryScreen extends StScreen {
     ) {
 
         int x = contentLeft + offset;
-        int y = PANEL_Y + 8;
+        int y = panelY + 8;
 
-        int w = (contentWidth - STATS_PAD * 2 - 3 * 5) / 4;
-
-        context.fill(
-                x,
-                y,
-                x + w,
-                y + 26,
-                Ui.argb(0x16FFFFFF, alpha)
+        int w = Math.max(
+                1,
+                (contentWidth - STATS_PAD * 2 - 3 * 5) / 4
         );
 
-        Ui.drawRoundBorder(
-                context,
-                x,
-                y,
-                w,
-                26,
-                3,
-                Ui.argb(color, alpha * 0.5f)
+        Ui.drawCard(context, x, y, w, 26, alpha);
+
+        // accent underline that carries the metric colour
+        context.fill(
+                x + 4,
+                y + 24,
+                x + w - 4,
+                y + 25,
+                Ui.argb(color, alpha * 0.7f)
         );
 
         String caption = Lang.t(captionKey);
 
         context.drawTextWithShadow(
                 textRenderer,
-                Text.literal(caption),
-                x + w / 2 - textRenderer.getWidth(caption) / 2,
+                Text.literal(
+                        textRenderer.trimToWidth(caption, Math.max(0, w - 6))
+                ),
+                x + w / 2 - textRenderer.getWidth(
+                        textRenderer.trimToWidth(
+                                caption,
+                                Math.max(0, w - 6)
+                        )
+                ) / 2,
                 y + 3,
                 Ui.argb(Ui.TEXT_DIM, alpha)
         );
@@ -1272,7 +1363,7 @@ public class ActionHistoryScreen extends StScreen {
                 textRenderer,
                 Text.literal(text),
                 x + w / 2 - textRenderer.getWidth(text) / 2,
-                y + 14,
+                y + 13,
                 Ui.argb(color, alpha)
         );
     }
@@ -1308,8 +1399,8 @@ public class ActionHistoryScreen extends StScreen {
         int rx = resetX;
 
         boolean over = mouseX >= rx && mouseX < rx + 52 &&
-                mouseY >= FILTER_Y &&
-                mouseY <= FILTER_Y + FILTER_H;
+                mouseY >= resetY &&
+                mouseY <= resetY + FILTER_H;
 
         boolean dirty =
                 typeFilter != null ||
@@ -1318,9 +1409,9 @@ public class ActionHistoryScreen extends StScreen {
 
         context.fill(
                 rx,
-                FILTER_Y,
+                resetY,
                 rx + 52,
-                FILTER_Y + FILTER_H,
+                resetY + FILTER_H,
                 Ui.argb(
                         dirty
                                 ? over ? 0x50FF5555 : 0x28FF5555
@@ -1332,7 +1423,7 @@ public class ActionHistoryScreen extends StScreen {
         Ui.drawRoundBorder(
                 context,
                 rx,
-                FILTER_Y,
+                resetY,
                 52,
                 FILTER_H,
                 3,
@@ -1353,7 +1444,7 @@ public class ActionHistoryScreen extends StScreen {
                 ),
                 rx + (52 - textRenderer.getWidth(
                         textRenderer.trimToWidth(reset, 44))) / 2,
-                FILTER_Y + 6,
+                resetY + 6,
                 Ui.argb(dirty ? Ui.DANGER : Ui.TEXT_MUTED, alpha)
         );
     }
@@ -1373,13 +1464,19 @@ public class ActionHistoryScreen extends StScreen {
                 (openMenu == MENU_TYPE && x == typeMenuX() ||
                         openMenu == MENU_STATUS && x == statusMenuX());
 
-        context.fill(
+        Ui.drawRoundRect(
+                context,
                 x,
-                FILTER_Y,
-                x + 96,
-                FILTER_Y + FILTER_H,
+                filterY,
+                filterChipW,
+                filterY + FILTER_H,
+                Design.RADIUS_MD,
                 Ui.argb(
-                        open ? 0x50ACC2F0 : hovered ? 0x30ACC2F0 : 0x22000000,
+                        open
+                                ? Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.30f)
+                                : hovered
+                                ? Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.18f)
+                                : Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.04f),
                         alpha
                 )
         );
@@ -1387,36 +1484,41 @@ public class ActionHistoryScreen extends StScreen {
         Ui.drawRoundBorder(
                 context,
                 x,
-                FILTER_Y,
-                96,
+                filterY,
+                filterChipW,
                 FILTER_H,
-                3,
+                Design.RADIUS_MD,
                 Ui.argb(
-                        open ? Ui.ACCENT : hovered ? Ui.ACCENT : 0xFF2C3B55,
+                        open || hovered
+                                ? Ui.ACCENT
+                                : Ui.mix(Ui.PANEL_BORDER, Ui.TEXT, 0.08f),
                         alpha * 0.9f
                 )
         );
 
-        String trimmed = textRenderer.trimToWidth(label, 76);
+        String trimmed = textRenderer.trimToWidth(
+                label,
+                Math.max(0, filterChipW - 20)
+        );
 
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(trimmed),
                 x + 6,
-                FILTER_Y + 6,
+                filterY + 6,
                 Ui.argb(color, alpha)
         );
 
         // little caret that shows the menu opens downwards
-        int caretX = x + 96 - 9;
+        int caretX = x + filterChipW - 9;
 
         for (int i = 0; i < 3; i++) {
 
             context.fill(
                     caretX - i,
-                    FILTER_Y + 8 + i,
+                    filterY + 8 + i,
                     caretX + i + 1,
-                    FILTER_Y + 9 + i,
+                    filterY + 9 + i,
                     Ui.argb(open ? Ui.ACCENT : Ui.TEXT_MUTED, alpha)
             );
         }
@@ -1444,6 +1546,16 @@ public class ActionHistoryScreen extends StScreen {
             float alpha
     ) {
 
+        Ui.drawRoundRect(
+                context,
+                contentLeft,
+                tableTop,
+                contentWidth,
+                tableBottom - tableTop,
+                Design.RADIUS_MD,
+                Ui.argb(Ui.PANEL_BG, alpha)
+        );
+
         drawTableHeader(context, alpha);
 
         List<PunishmentRecord> records = visible();
@@ -1454,18 +1566,25 @@ public class ActionHistoryScreen extends StScreen {
                     textRenderer,
                     Lang.text(Key.MSG_NO_HISTORY),
                     contentLeft + contentWidth / 2,
-                    TABLE_TOP + 22,
+                    tableTop + 22,
                     Ui.argb(Ui.TEXT_MUTED, alpha)
             );
 
             return;
         }
 
-        int y = TABLE_TOP - scroll;
+        int y = tableTop - scroll;
+
+        context.enableScissor(
+                contentLeft,
+                tableTop,
+                contentLeft + contentWidth,
+                tableBottom
+        );
 
         for (PunishmentRecord record : records) {
 
-            if (y + ROW_H >= TABLE_TOP && y <= tableBottom) {
+            if (y + ROW_H >= tableTop && y <= tableBottom) {
 
                 drawRecord(
                         context,
@@ -1481,6 +1600,7 @@ public class ActionHistoryScreen extends StScreen {
         }
 
         drawTableScrollbar(context, alpha);
+        context.disableScissor();
     }
 
     private void drawTableHeader(
@@ -1488,21 +1608,21 @@ public class ActionHistoryScreen extends StScreen {
             float alpha
     ) {
 
-        int y = TABLE_TOP - HEADER_H;
+        int y = tableTop - HEADER_H;
 
         context.fill(
                 contentLeft,
                 y + 8,
-                contentLeft + contentWidth,
+                contentLeft + tableContentWidth,
                 y + 9,
                 Ui.argb(0x2C3B55, alpha)
         );
 
-        header(context, Key.HIST_COL_TIME, 0, y, contentWidth * 30 / 100, alpha);
+        header(context, Key.HIST_COL_TIME, 0, y, colType - 6, alpha);
         header(context, Key.HIST_COL_ACTION, colType, y, colPlayer - colType - 6, alpha);
         header(context, Key.HIST_COL_PLAYER, colPlayer, y, colStatus - colPlayer - 6, alpha);
         header(context, Key.HIST_COL_STATUS, colStatus, y, colServer - colStatus - 6, alpha);
-        header(context, Key.HIST_COL_SERVER, colServer, y, contentWidth - colServer, alpha);
+        header(context, Key.HIST_COL_SERVER, colServer, y, tableContentWidth - colServer, alpha);
     }
 
     private void header(
@@ -1519,7 +1639,10 @@ public class ActionHistoryScreen extends StScreen {
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
-                        textRenderer.trimToWidth(caption, maxWidth)
+                        textRenderer.trimToWidth(
+                                caption,
+                                Math.max(0, maxWidth)
+                        )
                 ),
                 contentLeft + offset,
                 y,
@@ -1544,12 +1667,25 @@ public class ActionHistoryScreen extends StScreen {
 
         if (hovered) {
 
-            context.fill(
+            Ui.drawRoundRect(
+                    context,
                     contentLeft,
                     y,
-                    contentLeft + contentWidth,
-                    y + ROW_H,
-                    Ui.argb(0x2A2C3A4A, alpha)
+                    contentWidth,
+                    ROW_H,
+                    Design.RADIUS_SM,
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.18f),
+                            alpha
+                    )
+            );
+
+            context.fill(
+                    contentLeft + 1,
+                    y + 2,
+                    contentLeft + 3,
+                    y + ROW_H - 2,
+                    Ui.argb(Ui.ACCENT, alpha)
             );
 
         } else {
@@ -1560,8 +1696,11 @@ public class ActionHistoryScreen extends StScreen {
                     y,
                     contentWidth,
                     ROW_H,
-                    2,
-                    Ui.argb(0x12000000, alpha)
+                    Design.RADIUS_SM,
+                    Ui.argb(
+                            Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.025f),
+                            alpha * 0.9f
+                    )
             );
         }
 
@@ -1587,7 +1726,7 @@ public class ActionHistoryScreen extends StScreen {
         int y2 = y + 4;
 
         cell(context, time, 0, y2,
-                contentWidth * 30 / 100, Ui.TEXT_MUTED, alpha);
+                colType - 6, Ui.TEXT_MUTED, alpha);
 
         cell(context, type, colType, y2,
                 colPlayer - colType - 6, Ui.ACCENT_SOFT, alpha);
@@ -1599,7 +1738,7 @@ public class ActionHistoryScreen extends StScreen {
                 colServer - colStatus - 6, statusColor(status), alpha);
 
         cell(context, server, colServer, y2,
-                contentWidth - colServer, Ui.TEXT_MUTED, alpha);
+                tableContentWidth - colServer, Ui.TEXT_MUTED, alpha);
     }
 
     private void cell(
@@ -1615,7 +1754,10 @@ public class ActionHistoryScreen extends StScreen {
         context.drawTextWithShadow(
                 textRenderer,
                 Text.literal(
-                        textRenderer.trimToWidth(text, maxWidth)
+                        textRenderer.trimToWidth(
+                                text,
+                                Math.max(0, maxWidth)
+                        )
                 ),
                 contentLeft + offset,
                 y,
@@ -1634,24 +1776,29 @@ public class ActionHistoryScreen extends StScreen {
             return;
         }
 
-        int trackH = tableBottom - TABLE_TOP;
+        int trackH = tableBottom - tableTop;
+
+        if (trackH <= 0) {
+            return;
+        }
+
         int thumbH = Math.max(16, trackH * trackH / (trackH + max));
 
         int travel = trackH - thumbH;
-        int thumbY = TABLE_TOP + travel * scroll / max;
+        int thumbY = tableTop + travel * Math.min(scroll, max) / max;
 
         context.fill(
-                contentLeft + contentWidth + 1,
-                TABLE_TOP,
-                contentLeft + contentWidth + 2,
+                contentLeft + tableContentWidth + 1,
+                tableTop,
+                contentLeft + tableContentWidth + 2,
                 tableBottom,
                 Ui.argb(0x18FFFFFF, alpha)
         );
 
         context.fill(
-                contentLeft + contentWidth + 1,
+                contentLeft + tableContentWidth + 1,
                 thumbY,
-                contentLeft + contentWidth + 2,
+                contentLeft + tableContentWidth + 2,
                 thumbY + thumbH,
                 Ui.argb(Ui.ACCENT_SOFT, alpha * 0.9f)
         );

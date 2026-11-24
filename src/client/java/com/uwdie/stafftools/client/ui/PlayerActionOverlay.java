@@ -33,14 +33,14 @@ public final class PlayerActionOverlay {
     public static final PlayerActionOverlay INSTANCE =
             new PlayerActionOverlay();
 
-    private static final int PAD = 6;
-    private static final int HEADER_H = 30;
-    private static final int FIXED_H = 20;
-    private static final int FIXED_GAP = 3;
-    private static final int FOOTER_H = 13;
-    private static final int ROW_H = 16;
-    private static final int ROW_GAP = 4;
-    private static final int SEP_H = 15;
+    private static final int PAD = 8;
+    private static final int HEADER_H = 34;
+    private static final int FIXED_H = 22;
+    private static final int FIXED_GAP = 4;
+    private static final int FOOTER_H = 14;
+    private static final int ROW_H = 20;
+    private static final int ROW_GAP = 3;
+    private static final int SEP_H = 18;
     private static final int GRIP_SIZE = 16;
     private static final int RESIZE_SIZE = 14;
     private static final int MIN_W = StaffToolsConfig.MIN_POPUP_WIDTH;
@@ -375,11 +375,16 @@ public final class PlayerActionOverlay {
                 mouseY <= panelY + panelH;
     }
 
+    /**
+     * The whole header strip is the drag handle: grabbing the panel by
+     * its title bar is what every desktop window does, and it removes
+     * the need for a separate grip button in the corner.
+     */
     private boolean inGrip(double mouseX, double mouseY) {
-        return mouseX >= panelX + panelW - GRIP_SIZE &&
+        return mouseX >= panelX &&
                 mouseX <= panelX + panelW &&
                 mouseY >= panelY &&
-                mouseY <= panelY + GRIP_SIZE;
+                mouseY <= panelY + PAD + HEADER_H;
     }
 
     private boolean inResize(double mouseX, double mouseY) {
@@ -465,17 +470,13 @@ public final class PlayerActionOverlay {
 
         long now = System.currentTimeMillis();
 
-        float t = Ui.clamp01(
-                (now - openTime) / 160f
-        );
+        float t = Ui.entranceProgress(openTime, 0L, 180L);
 
-        float scale =
-                0.92f +
-                        0.08f * Ui.easeOutCubic(t);
+        float scale = Ui.animationsEnabled()
+                ? 0.92f + 0.08f * t
+                : 1f;
 
-        float alpha = Ui.clamp01(
-                (now - openTime) / 140f
-        );
+        float alpha = Ui.entranceProgress(openTime, 0L, 160L);
 
         // closing animation: fade out and slide up
         int riseY = 0;
@@ -488,16 +489,22 @@ public final class PlayerActionOverlay {
                 // delayed close (flash window) — draw normally
             } else {
 
-                float k = Ui.clamp01(passed / 160f);
-
-                if (k >= 1f) {
+                if (!Ui.animationsEnabled()) {
                     finishClose();
                     return;
                 }
 
-                alpha *= (1f - k);
-                scale *= (1f - 0.03f * k);
-                riseY = -(int) (8f * Ui.easeOutCubic(k));
+                float rawClose = Ui.animationProgress(closeAt, 160L);
+
+                if (rawClose >= 1f) {
+                    finishClose();
+                    return;
+                }
+
+                float close = Ui.easeInCubic(rawClose);
+                alpha *= 1f - close;
+                scale *= 1f - 0.03f * close;
+                riseY = -(int) (8f * Ui.easeOutCubic(rawClose));
             }
         }
 
@@ -554,8 +561,14 @@ public final class PlayerActionOverlay {
 
         // every label is clamped to the CURRENT panel width, so a long
         // macro name can never spill outside the frame
-        int headerAvail = panelW - PAD * 2;
+        int headerAvail = panelW - PAD * 2 - 26;
         int rowAvail = panelW - PAD * 2 - 10;
+
+        // header: avatar square, nick and the punishment counter
+        int headSize = 20;
+
+        // the target's own skin head, so the popup shows who it acts on
+        drawPlayerHead(context, PAD, PAD + 1, headSize, alpha);
 
         if (player.name() != null) {
 
@@ -567,8 +580,8 @@ public final class PlayerActionOverlay {
                                     headerAvail
                             )
                     ),
-                    PAD,
-                    PAD + 3,
+                    PAD + headSize + 6,
+                    PAD + 2,
                     Ui.argb(Ui.TEXT, alpha)
             );
         }
@@ -582,9 +595,9 @@ public final class PlayerActionOverlay {
                                 headerAvail
                         )
                 ),
-                PAD,
-                PAD + 16,
-                Ui.argb(Ui.TEXT_DIM, alpha)
+                PAD + headSize + 6,
+                PAD + 13,
+                Ui.argb(Ui.TEXT_MUTED, alpha)
         );
 
         drawFixedRows(
@@ -595,12 +608,13 @@ public final class PlayerActionOverlay {
                 alpha
         );
 
-        context.fill(
+        // hairline between the quick buttons and the scrolling list
+        Ui.drawDivider(
+                context,
                 PAD,
                 PAD + HEADER_H + FIXED_H,
-                panelW - PAD,
-                PAD + HEADER_H + FIXED_H + 1,
-                Ui.argb(0x2C3B55, alpha)
+                panelW - PAD * 2,
+                alpha
         );
 
         // clip the scrolling list so rows never overlap
@@ -677,6 +691,63 @@ public final class PlayerActionOverlay {
     }
 
     /**
+     * Draws the target player's head from their tab-list skin, falling
+     * back to a neutral accent square when the skin is not available
+     * (offline player, or no world loaded).
+     */
+    private void drawPlayerHead(
+            DrawContext context,
+            int x,
+            int y,
+            int size,
+            float alpha
+    ) {
+
+        var handler = MinecraftClient.getInstance()
+                .getNetworkHandler();
+
+        var entry = handler == null || player == null
+                ? null
+                : handler.getPlayerListEntry(player.uuid());
+
+        if (entry == null) {
+
+            Ui.drawRoundRect(
+                    context, x, y, size, size,
+                    Design.RADIUS_SM,
+                    Ui.argb(Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.30f), alpha)
+            );
+
+            return;
+        }
+
+        var skin = entry.getSkinTextures().body().texturePath();
+
+        int color = Ui.argb(0xFFFFFFFF, alpha);
+
+        // front face of the head, with the hat layer on top
+        context.drawTexture(
+                net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                skin,
+                x, y,
+                8.0F, 8.0F,
+                size, size,
+                64, 64,
+                color
+        );
+
+        context.drawTexture(
+                net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED,
+                skin,
+                x, y,
+                40.0F, 8.0F,
+                size, size,
+                64, 64,
+                color
+        );
+    }
+
+    /**
      * Total punishment count for the target, taken from the local history.
      */
     private String punishmentSummary(String name) {
@@ -708,7 +779,15 @@ public final class PlayerActionOverlay {
      */
     private void updateScroll(float delta) {
 
-        float step = Ui.clamp01(delta) * 0.05f;
+        if (!Ui.animationsEnabled()) {
+            scroll = Math.clamp(scrollTarget, 0f, maxScroll);
+            scrollVel = 0f;
+            updateScrollbar(delta);
+            return;
+        }
+
+        float step = Ui.clamp01(delta) * 0.05f
+                * Ui.animationSpeed();
         float target = Math.clamp(
                 scrollTarget,
                 -SCROLL_RUBBER,
@@ -762,8 +841,12 @@ public final class PlayerActionOverlay {
         // fade in fast, drift out slowly
         float rate = active ? 11f : 3.5f;
 
-        barAlpha += ((active ? 1f : 0f) - barAlpha)
-                * Math.min(1f, delta * rate);
+        barAlpha = Ui.animateTowards(
+                barAlpha,
+                active ? 1f : 0f,
+                delta,
+                rate
+        );
 
         float thumbH = trackH <= 0f
                 ? 0f
@@ -777,11 +860,19 @@ public final class PlayerActionOverlay {
                 ? 0f
                 : Ui.clamp01(scroll / maxScroll);
 
-        barLen += (thumbH - barLen)
-                * Math.min(1f, delta * 12f);
+        barLen = Ui.animateTowards(
+                barLen,
+                thumbH,
+                delta,
+                12f
+        );
 
-        barPos += (t * travel - barPos)
-                * Math.min(1f, delta * 9f);
+        barPos = Ui.animateTowards(
+                barPos,
+                t * travel,
+                delta,
+                9f
+        );
     }
 
     /**
@@ -871,15 +962,9 @@ public final class PlayerActionOverlay {
 
         long now = System.currentTimeMillis();
 
-        float slide = Ui.easeOutCubic(
-                Ui.clamp01(
-                        (now - aliasOpenTime) / 220f
-                )
-        );
+        float slide = Ui.entranceProgress(aliasOpenTime, 0L, 220L);
 
-        float modalAlpha = Ui.clamp01(
-                (now - aliasOpenTime) / 160f
-        );
+        float modalAlpha = Ui.entranceProgress(aliasOpenTime, 0L, 160L);
 
         if (modalAlpha <= 0.01f) {
             return;
@@ -940,11 +1025,10 @@ public final class PlayerActionOverlay {
             String alias = aliasList.get(index);
 
             // staggered per-row slide-in
-            float ri = Ui.easeOutCubic(
-                    Ui.clamp01(
-                            (now - aliasOpenTime
-                                    - 70L - i * 45L) / 190f
-                    )
+            float ri = Ui.entranceProgress(
+                    aliasOpenTime,
+                    70L + i * 20L,
+                    190L
             );
 
             if (ri <= 0.02f) {
@@ -1069,24 +1153,23 @@ public final class PlayerActionOverlay {
             float alpha
     ) {
 
-        int bg = Ui.argb(0x22000000, alpha);
-        int border = 0xFF2C3B55;
-
-        if (hovered) {
-            bg = Ui.argb(0x403F8AE0, alpha);
-            border = Ui.ACCENT;
-        }
-
-        context.fill(x, y, x + w, y + h, bg);
+        Ui.drawRoundRect(
+                context,
+                x, y, w, h,
+                Design.RADIUS_MD,
+                Ui.argb(
+                        hovered
+                                ? Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.22f)
+                                : Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.04f),
+                        alpha
+                )
+        );
 
         Ui.drawRoundBorder(
                 context,
-                x,
-                y,
-                w,
-                h,
-                3,
-                Ui.argb(border, alpha)
+                x, y, w, h,
+                Design.RADIUS_MD,
+                Ui.argb(hovered ? Ui.ACCENT : Ui.BORDER, alpha)
         );
 
         String text = icon + " " + label;
@@ -1148,10 +1231,12 @@ public final class PlayerActionOverlay {
 
         if (confirmItem != null) {
 
-            remain = Ui.clamp01(
-                    (CONFIRM_MS - (now - confirmAt))
-                            / (float) CONFIRM_MS
-            );
+            remain = Ui.animationsEnabled()
+                    ? Ui.clamp01(
+                            (CONFIRM_MS - (now - confirmAt))
+                                    / (float) CONFIRM_MS
+                    )
+                    : 1f;
         }
 
         int hoverNow = -1;
@@ -1168,19 +1253,39 @@ public final class PlayerActionOverlay {
                 if (absY >= contentTop - SEP_H &&
                         absY <= contentBottom) {
 
+                    String caption = tr.trimToWidth(
+                            row.item.label,
+                            panelW - PAD * 2 - 20
+                    );
+
                     context.drawCenteredTextWithShadow(
                             tr,
-                            Text.literal(
-                                    tr.trimToWidth(
-                                            "\u2500 " +
-                                                    row.item.label +
-                                                    " \u2500",
-                                            panelW - PAD * 2
-                                    )
-                            ),
+                            Text.literal(caption),
                             panelW / 2,
                             absY + (SEP_H - 9) / 2,
-                            Ui.argb(0xFF88A0CC, alpha)
+                            Ui.argb(Ui.TEXT_MUTED, alpha)
+                    );
+
+                    // hairlines on both sides of the caption
+                    int capW = tr.getWidth(caption);
+
+                    int capLeft = panelW / 2 - capW / 2 - 6;
+                    int capRight = panelW / 2 + capW / 2 + 6;
+
+                    Ui.drawDivider(
+                            context,
+                            PAD,
+                            absY + SEP_H / 2,
+                            Math.max(0, capLeft - PAD),
+                            alpha * 0.8f
+                    );
+
+                    Ui.drawDivider(
+                            context,
+                            capRight,
+                            absY + SEP_H / 2,
+                            Math.max(0, panelW - PAD - capRight),
+                            alpha * 0.8f
                     );
                 }
 
@@ -1215,19 +1320,26 @@ public final class PlayerActionOverlay {
             } else if (flashing) {
                 bg = Ui.argb(0x4055DD77, alpha);
             } else if (hovered) {
-                bg = Ui.argb(0x403F8AE0, alpha);
-            }
-
-            if (bg != 0) {
-
-                context.fill(
-                        PAD,
-                        absY,
-                        panelW - PAD,
-                        absY + ROW_H - 2,
-                        bg
+                bg = Ui.argb(
+                        Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.20f),
+                        alpha
+                );
+            } else {
+                bg = Ui.argb(
+                        Ui.mix(Ui.PANEL_BG, Ui.TEXT, 0.035f),
+                        alpha * 0.9f
                 );
             }
+
+            Ui.drawRoundRect(
+                    context,
+                    PAD,
+                    absY,
+                    panelW - PAD * 2,
+                    ROW_H - 2,
+                    5,
+                    bg
+            );
 
             int borderColor =
                     confirming
@@ -1236,7 +1348,7 @@ public final class PlayerActionOverlay {
                             ? Ui.SUCCESS
                             : hovered
                             ? Ui.ACCENT
-                            : 0xFF2C3B55;
+                            : Ui.mix(Ui.PANEL_BORDER, Ui.TEXT, 0.08f);
 
             Ui.drawRoundBorder(
                     context,
@@ -1244,14 +1356,26 @@ public final class PlayerActionOverlay {
                     absY,
                     panelW - PAD * 2,
                     ROW_H - 2,
-                    3,
+                    5,
                     Ui.argb(
                             borderColor,
                             alpha * (hovered || confirming
                                     ? 1f
-                                    : 0.55f)
+                                    : 0.5f)
                     )
             );
+
+            // accent edge on the hovered row, matching the list screens
+            if (hovered && !confirming) {
+
+                context.fill(
+                        PAD + 1,
+                        absY + 3,
+                        PAD + 3,
+                        absY + ROW_H - 5,
+                        Ui.argb(Ui.ACCENT, alpha)
+                );
+            }
 
             if (confirming) {
 
@@ -1328,6 +1452,11 @@ public final class PlayerActionOverlay {
      * Bottom-right corner: drag to resize the whole popup (every element
      * re-flows through the new width/height).
      */
+    /**
+     * Resize affordance: three diagonal ticks in the bottom-right corner.
+     * The corner itself is the hit area, so there is no separate button
+     * frame to misalign with the rounded border.
+     */
     private void drawResizeHandle(
             DrawContext context,
             TextRenderer tr,
@@ -1336,61 +1465,33 @@ public final class PlayerActionOverlay {
             float alpha
     ) {
 
-        int x = panelW - RESIZE_SIZE;
-        int y = panelH - RESIZE_SIZE;
-
         boolean hovered =
                 resizing || inResize(mouseX, mouseY);
 
-        int border = hovered
-                ? Ui.ACCENT
-                : Ui.mix(0xFF3A4A66, Ui.ACCENT, 0.35f);
-
-        if (hovered) {
-
-            context.fill(
-                    x + 1,
-                    y + 1,
-                    panelW - 1,
-                    panelH - 1,
-                    Ui.argb(
-                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.38f),
-                            alpha
-                    )
-            );
-        }
-
-        Ui.drawRoundBorder(
-                context,
-                x,
-                y,
-                RESIZE_SIZE,
-                RESIZE_SIZE,
-                3,
-                Ui.argb(border, alpha)
-        );
-
-        // three diagonal ticks pointing to the corner
         int dotColor = hovered
                 ? Ui.ACCENT_SOFT
-                : Ui.mix(0xFF556070, Ui.ACCENT_SOFT, 0.4f);
+                : Ui.mix(Ui.TEXT_MUTED, Ui.ACCENT_SOFT, 0.35f);
 
         for (int i = 0; i < 3; i++) {
 
             int len = 3 + i * 3;
-            int ox = panelW - 3 - len;
-            int oy = panelH - 3 - i * 3;
+            int ox = panelW - 6 - len;
+            int oy = panelH - 6 - i * 3;
 
             context.fill(
                     ox,
                     oy,
-                    panelW - 3 - i * 3,
+                    panelW - 6 - i * 3,
                     oy + 1,
                     Ui.argb(dotColor, alpha)
             );
         }
     }
 
+    /**
+     * Header affordance: a subtle grab hint on the right of the title
+     * bar. The whole header is draggable, so this is only a visual cue.
+     */
     private void drawGrip(
             DrawContext context,
             TextRenderer tr,
@@ -1399,61 +1500,19 @@ public final class PlayerActionOverlay {
             float alpha
     ) {
 
-        int gx = panelW - GRIP_SIZE;
-        int gy = 0;
+        boolean hovered = dragging || inGrip(mouseX, mouseY);
 
-        boolean hovered =
-                dragging ||
-                        inGrip(mouseX, mouseY);
-
-        float pulse = 0.5f + 0.5f *
-                (float) Math.sin(
-                        System.currentTimeMillis() / 280.0
-                );
-
-        int borderColor = hovered
-                ? Ui.ACCENT
-                : Ui.mix(0xFF3A4A66, Ui.ACCENT,
-                0.25f + 0.75f * pulse);
-
-        int dotColor = dragging
+        int dotColor = hovered
                 ? Ui.ACCENT_SOFT
-                : hovered
-                ? Ui.ACCENT_SOFT
-                : Ui.mix(0xFF556070, Ui.ACCENT_SOFT, pulse);
-
-        if (hovered) {
-
-            // opaque so the corner reads as one piece with the frame
-            context.fill(
-                    gx + 1,
-                    gy + 1,
-                    gx + GRIP_SIZE - 1,
-                    gy + GRIP_SIZE - 1,
-                    Ui.argb(
-                            Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.38f),
-                            alpha
-                    )
-            );
-        }
-
-        Ui.drawRoundBorder(
-                context,
-                gx,
-                gy,
-                GRIP_SIZE,
-                GRIP_SIZE,
-                3,
-                Ui.argb(borderColor, alpha)
-        );
+                : Ui.mix(Ui.TEXT_MUTED, Ui.ACCENT_SOFT, 0.35f);
 
         String dots = "\u22EF";
 
         context.drawTextWithShadow(
                 tr,
                 Text.literal(dots),
-                gx + (GRIP_SIZE - tr.getWidth(dots)) / 2,
-                gy + (GRIP_SIZE - 9) / 2 + 1,
+                panelW - PAD - tr.getWidth(dots),
+                PAD + 2,
                 Ui.argb(dotColor, alpha)
         );
     }

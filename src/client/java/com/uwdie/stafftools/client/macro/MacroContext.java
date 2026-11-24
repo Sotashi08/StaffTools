@@ -21,6 +21,21 @@ public class MacroContext {
                 new LinkedHashMap<>(variables);
     }
 
+    /**
+     * Builds a context from explicit variables. Used by the command
+     * preview, which must not read the live game state.
+     */
+    public static MacroContext of(
+            PlayerContext player,
+            Map<String, String> variables
+    ) {
+
+        return new MacroContext(
+                player,
+                variables == null ? Map.of() : variables
+        );
+    }
+
     public static MacroContext create(
             PlayerContext target
     ) {

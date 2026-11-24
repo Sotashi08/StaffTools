@@ -3,6 +3,9 @@ package com.uwdie.stafftools.client.punishment;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.uwdie.stafftools.client.audit.AuditCategory;
+import com.uwdie.stafftools.client.audit.AuditLog;
+import com.uwdie.stafftools.client.audit.Profiler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ServerInfo;
 
@@ -84,6 +87,20 @@ public final class PunishmentHistory {
     /** Called whenever the player sends a chat command. */
     public void onCommandSent(String command) {
 
+        long startedAt = System.nanoTime();
+
+        try {
+            recordCommand(command);
+        } finally {
+            Profiler.get().record(
+                    Profiler.PUNISH_SEND,
+                    System.nanoTime() - startedAt
+            );
+        }
+    }
+
+    private void recordCommand(String command) {
+
         PunishmentRecord record =
                 CommandAnalyzer.analyze(command);
 
@@ -106,12 +123,25 @@ public final class PunishmentHistory {
             record.setSourceName(consumeSource());
             record.setSourceKind(consumeKind());
 
+            // Generate correlation ID for matching response
+            record.setCorrelationId(java.util.UUID.randomUUID().toString());
+
             rememberServer(record.getServerKey());
             rememberServer(currentSessionServer().getKey());
 
             records.add(0, record);
             trim();
             save();
+
+            AuditLog.get().info(
+                    AuditCategory.PUNISH,
+                    "Issued " + record.getType().name()
+                            + " on " + record.getPlayerName()
+                            + (record.getSourceName() == null
+                            ? ""
+                            : " via " + record.getSourceName())
+                            + ": " + record.getFullCommand()
+            );
         }
 
         expireMacro();
@@ -210,6 +240,20 @@ public final class PunishmentHistory {
 
             return;
         }
+
+        long startedAt = System.nanoTime();
+
+        try {
+            resolveReply(message);
+        } finally {
+            Profiler.get().record(
+                    Profiler.PUNISH_REPLY,
+                    System.nanoTime() - startedAt
+            );
+        }
+    }
+
+    private void resolveReply(String message) {
 
         String lower =
                 CommandAnalyzer.normalize(message);
@@ -332,6 +376,16 @@ public final class PunishmentHistory {
         best.setResponse(message);
 
         save();
+
+        AuditLog.get().log(
+                AuditCategory.PUNISH,
+                outcome == PunishmentStatus.FAILED
+                        ? com.uwdie.stafftools.client.audit.AuditLevel.ERROR
+                        : com.uwdie.stafftools.client.audit.AuditLevel.SUCCESS,
+                "Reply resolved " + best.getType().name()
+                        + " on " + best.getPlayerName()
+                        + " -> " + outcome.name()
+        );
     }
 
     // ------------------------------------------------------------------
@@ -534,7 +588,7 @@ public final class PunishmentHistory {
         }
     }
 
-    private void save() {
+    public void save() {
         try {
 
             Files.createDirectories(path.getParent());

@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Small moderator panel that fades in together with the chat.
+ * Small moderator panel with a rotating set of chat-transition effects.
  *
  * Shows who is on duty, where, how long the session runs and how many
  * punishments were issued during it, plus one rotating funny phrase.
@@ -27,10 +27,16 @@ public final class ModeratorHud {
 
     public static final ModeratorHud INSTANCE = new ModeratorHud();
 
-    private static final int PANEL_W = 168;
-    private static final int PAD = 8;
+    private static final int PANEL_W = 176;
+    private static final int PAD = 10;
     private static final int LINE_H = 10;
-    private static final int HEAD_SIZE = 20;
+    private static final int HEAD_SIZE = 22;
+    private static final int EFFECT_DISINTEGRATE = 0;
+    private static final int EFFECT_BLOCKS = 1;
+    private static final int EFFECT_FADE = 2;
+    private static final int EFFECT_GLITCH = 3;
+    private static final int EFFECT_COUNT = 4;
+    private static final long TRANSITION_DURATION_MS = 520L;
 
     /** Custom phrases; they wrap and the frame follows their height. */
     private static final String[] PHRASES = {
@@ -44,13 +50,60 @@ public final class ModeratorHud {
             "Скоро отпущу. Досмотри сериал",
             "Мой прайм уже на паузе",
             "Обещаю, это будет быстро",
+            "Чат читаю, но не всё прощаю",
+            "Мут — это тоже забота",
+            "Я не злой, я по правилам",
+            "Кто тут шумит? А, это я",
+            "Работаю за спасибо и за чай",
+            "Ещё один флуд — и я в отпуске",
+            "Спокойствие, только спокойствие",
+            "Правила читали? Я так и думал",
+            "Модератор тоже человек. Почти",
+            "Тишина в чате — моя лучшая награда",
+            "Не спорь со мной, я с банхаммером",
+            "Сегодня без банов. Наверное",
+            "Я всё вижу. Даже твой капс",
+            "Отдохни от чата, я подожду",
+            "Хорошего дня. Это не просьба",
+            "Мут выдан с любовью",
+            "Я не сплю, я наблюдаю",
+            "Кнопка «бан» такая близкая",
+            "Давай без крайностей, ладно?",
+            "Улыбнись, тебя видит модератор",
+            "Порядок в чате начинается с уважения",
+            "Здесь можно спорить, но без капса",
+            "Нарушение замечено, терпение тоже",
+            "Проверка чата: всё под контролем",
+            "Я за диалог, но логи уже открыты",
+            "Не торопись, я читаю каждую строку",
+            "Тишина — это тоже командная работа",
+            "Сегодня у меня режим «всё замечаю»",
+            "Пожалуйста, оставьте токсичность в инвентаре",
+            "Команда «пожаловаться» быстрее спора",
+            "Если что — правила рядом, я дальше",
+            "Модерация без паники, но с логами",
+            "Чат чистый — у модератора выходной",
+            "Проверяю сообщения, а не телепатию",
+            "Сначала предупреждение, потом история",
+            "Каждой жалобе — своё внимание",
+            "Не флуди, оставь место другим",
+            "Банхаммер заряжен, но я спокоен",
+            "Я видел это сообщение. И предыдущее тоже",
+            "Пусть сегодня победит здравый смысл",
     };
 
     private final MinecraftClient client = MinecraftClient.getInstance();
 
     /** 0 = hidden, 1 = fully shown; animated on every frame. */
     private float shown;
-    private long lastFrame;
+    private boolean chatStateInitialized;
+    private boolean lastChatOpen;
+    private boolean transitionOpening;
+    private int animationIndex = -1;
+    private long transitionStartedAt;
+    private float transitionStartShown;
+    private float transitionTarget;
+    private float transitionProgress;
 
     private boolean dragging;
     private double dragOffsetX;
@@ -70,8 +123,8 @@ public final class ModeratorHud {
     }
 
     /**
-     * Called from the chat screen render. Draws nothing when the panel
-     * is disabled or the chat is closed and the fade-out already ended.
+     * Called while the chat is open and during the short closing
+     * transition. Draws nothing after the panel has fully disappeared.
      */
     public void render(
             DrawContext context,
@@ -85,6 +138,7 @@ public final class ModeratorHud {
         if (!enabled) {
 
             shown = 0.0F;
+            chatStateInitialized = false;
             return;
         }
 
@@ -105,11 +159,11 @@ public final class ModeratorHud {
         String[] phrase = phrase();
 
         int phraseH = StafftoolsClient.getConfig().isModHudPhrases()
-                ? phrase.length * (LINE_H + 1)
+                ? phrase.length * (LINE_H + 1) + 8
                 : 0;
 
         int panelH =
-                PAD + HEAD_SIZE + 4 + 4 * (LINE_H + 3) + 5 + phraseH + PAD;
+                PAD + HEAD_SIZE + 8 + 4 * (LINE_H + 4) + phraseH + PAD;
 
         if (!placed) {
 
@@ -122,35 +176,96 @@ public final class ModeratorHud {
         panelX = clamp(panelX, -PANEL_W / 2, screenW - PANEL_W / 2);
         panelY = clamp(panelY, 0, screenH - 20);
 
-        float t = Ui.easeOutCubic(shown);
+        float t = shown;
+        int effect = Math.max(0, animationIndex);
+        float panelAlpha = t;
 
-        // slide in from the right, fade out in place
-        int x = panelX + (int) ((1.0F - t) * 16.0F);
-        int y = panelY - (int) ((1.0F - t) * 6.0F);
+        int xShift = switch (effect) {
+            case EFFECT_DISINTEGRATE -> Math.round((1.0F - t) * 26.0F);
+            case EFFECT_BLOCKS -> Math.round((1.0F - t) * 18.0F);
+            case EFFECT_GLITCH -> 0;
+            case EFFECT_FADE -> Math.round((1.0F - t) * 14.0F);
+            default -> 0;
+        };
+        int x = panelX + xShift;
+        int yOffset = switch (effect) {
+            case EFFECT_DISINTEGRATE -> 5;
+            case EFFECT_BLOCKS -> 4;
+            case EFFECT_FADE -> 8;
+            default -> 0;
+        };
+        int y = panelY - Math.round((1.0F - t) * yOffset);
+        float glitchIntensity = 0.0F;
 
-        Ui.drawPanel(context, x, y, PANEL_W, panelH, shown);
-        Ui.drawOrbitFrame(context, x, y, PANEL_W, panelH, shown);
+        if (effect == EFFECT_GLITCH && Ui.animationsEnabled()) {
+            glitchIntensity = (float) Math.sin(
+                    transitionProgress * Math.PI
+            );
+            long now = System.currentTimeMillis();
+            float horizontalWave = (float) (
+                    Math.sin(now * 0.014) * 0.68
+                            + Math.sin(now * 0.009 + 1.2) * 0.32
+            );
+            x += Math.round(
+                    horizontalWave * glitchIntensity * 3.0F
+            );
+            y += Math.round(
+                    (float) Math.sin(now * 0.011 + 0.7)
+                            * glitchIntensity * 1.5F
+            );
+        }
+
+        float scale = 1.0F;
+        if (Ui.animationsEnabled()) {
+            float settle = (float) Math.sin(
+                    transitionProgress * Math.PI
+            ) * 0.008F;
+            scale = switch (effect) {
+                case EFFECT_DISINTEGRATE -> 0.92F + 0.08F * t + settle;
+                case EFFECT_BLOCKS -> 0.95F + 0.05F * t + settle * 0.5F;
+                case EFFECT_GLITCH -> 0.99F + 0.01F * t;
+                case EFFECT_FADE -> 0.96F + 0.04F * t + settle;
+                default -> 1.0F;
+            };
+        }
+        context.getMatrices().pushMatrix();
+        context.getMatrices().translate(
+                x + PANEL_W / 2f,
+                y + panelH / 2f
+        );
+        context.getMatrices().scale(scale, scale);
+        context.getMatrices().translate(
+                -(x + PANEL_W / 2f),
+                -(y + panelH / 2f)
+        );
+
+        Ui.drawPopupFrame(context, x, y, PANEL_W, panelH, panelAlpha);
 
         int textX = x + PAD;
 
-        drawHeader(context, x, y, nick, shown);
+        float headerAlpha = componentAlpha(t, 0.02F);
+        drawHeader(context, x, y, nick, headerAlpha);
 
-        int textY = y + PAD + HEAD_SIZE + 4;
+        int textY = y + PAD + HEAD_SIZE + 8;
+        float moderatorAlpha = componentAlpha(t, 0.04F);
 
-        drawRow(context, textX, textY, "\u25CF",
+        drawRow(context, textX, textY, "\u25C9",
                 Lang.t(Key.HUD_MODERATOR), nick,
-                Ui.ACCENT_2, shown);
-        textY += LINE_H + 3;
+                Ui.ACCENT_SOFT, moderatorAlpha);
+        textY += LINE_H + 4;
+        float serverAlpha = componentAlpha(t, 0.08F);
 
         drawRow(context, textX, textY, "\u25B2",
                 Lang.t(Key.HUD_SERVER), server,
-                Ui.TEXT, shown);
-        textY += LINE_H + 3;
+                Ui.TEXT, serverAlpha);
+        textY += LINE_H + 4;
+        float sessionAlpha = componentAlpha(t, 0.12F);
 
         drawRow(context, textX, textY, "\u23F1",
                 Lang.t(Key.HUD_SESSION), sessionTime(),
-                Ui.TEXT, shown);
-        textY += LINE_H + 3;
+                Ui.TEXT, sessionAlpha);
+        textY += LINE_H + 4;
+        float punishmentAlpha = componentAlpha(t, 0.16F);
 
         drawRow(context, textX, textY, "\u2696",
                 Lang.t(Key.HUD_PUNISHED),
@@ -158,36 +273,200 @@ public final class ModeratorHud {
                 sessionPunishments == 0
                         ? Ui.TEXT_DIM
                         : Ui.WARNING,
-                shown);
+                punishmentAlpha);
 
-        textY += LINE_H + 5;
+        textY += LINE_H + 6;
 
         if (phraseH > 0) {
+            float phraseAlpha = componentAlpha(t, 0.22F);
 
             // separator between the data and the phrase
-            Ui.drawHeader(
+            Ui.drawDivider(
                     context,
                     textX,
                     textY - 4,
                     PANEL_W - PAD * 2,
-                    shown * 0.6f
+                    phraseAlpha * 0.8f
             );
 
-            textY += 2;
+            textY += 4;
 
-            for (String line : phrase) {
+            for (int i = 0; i < phrase.length; i++) {
+
+                float lineAlpha = componentAlpha(
+                        t,
+                        0.22F + i * 0.035F
+                );
 
                 context.drawTextWithShadow(
                         client.textRenderer,
-                        Text.literal(line),
+                        Text.literal(phrase[i]),
                         textX,
                         textY,
-                        Ui.argb(Ui.ACCENT_2, shown)
+                        Ui.argb(Ui.ACCENT_SOFT, lineAlpha)
                 );
 
                 textY += LINE_H + 1;
             }
         }
+
+        if (Ui.animationsEnabled()) {
+            drawTransitionEffect(
+                    context,
+                    x,
+                    y,
+                    panelH,
+                    transitionProgress,
+                    glitchIntensity
+            );
+        }
+
+        context.getMatrices().popMatrix();
+    }
+
+    private void drawTransitionEffect(
+            DrawContext context,
+            int x,
+            int y,
+            int panelH,
+            float progress,
+            float glitchIntensity
+    ) {
+
+        if (animationIndex == EFFECT_DISINTEGRATE) {
+
+            for (int i = 0; i < 16; i++) {
+
+                float pieceProgress = staggeredProgress(
+                        progress,
+                        i % 7,
+                        0.045F
+                );
+                float detached = transitionOpening
+                        ? 1.0F - pieceProgress
+                        : pieceProgress;
+                float opacity = transitionOpening
+                        ? (1.0F - pieceProgress) * 0.82F
+                        : pieceProgress * (1.0F - pieceProgress) * 2.2F;
+
+                if (opacity <= 0.01F) {
+                    continue;
+                }
+
+                double angle = i * 2.399963229728653;
+                float travel = detached * (24.0F + i % 3 * 5.0F);
+                int fragmentX = x + 8 + i * 29 % (PANEL_W - 20);
+                int fragmentY = y + 8
+                        + i * 19 % Math.max(1, panelH - 16);
+                int offsetX = Math.round((float) Math.cos(angle) * travel);
+                int offsetY = Math.round((float) Math.sin(angle) * travel);
+                int size = 2 + i % 3;
+                int color = i % 2 == 0 ? Ui.ACCENT_SOFT : Ui.ACCENT_2;
+
+                context.fill(
+                        fragmentX + offsetX,
+                        fragmentY + offsetY,
+                        fragmentX + offsetX + size,
+                        fragmentY + offsetY + size,
+                        Ui.argb(color, opacity)
+                );
+            }
+
+            return;
+        }
+
+        if (animationIndex == EFFECT_BLOCKS) {
+
+            for (int i = 0; i < 10; i++) {
+
+                float blockProgress = staggeredProgress(
+                        progress,
+                        i % 5,
+                        0.055F
+                );
+                float detached = transitionOpening
+                        ? 1.0F - blockProgress
+                        : blockProgress;
+                float opacity = transitionOpening
+                        ? (1.0F - blockProgress) * 0.72F
+                        : blockProgress * (1.0F - blockProgress) * 2.0F;
+
+                if (opacity <= 0.01F) {
+                    continue;
+                }
+
+                int size = 4 + i % 3 * 2;
+                int fragmentY = y + 12
+                        + i * Math.max(1, panelH - 24) / 10;
+                boolean left = i % 2 == 0;
+                int travel = Math.round(detached * 18.0F);
+                int fragmentX = left
+                        ? x - travel
+                        : x + PANEL_W - size + travel;
+                int color = i % 3 == 0 ? Ui.ACCENT_SOFT : Ui.ACCENT;
+
+                context.fill(
+                        fragmentX,
+                        fragmentY,
+                        fragmentX + size,
+                        fragmentY + size,
+                        Ui.argb(color, opacity)
+                );
+            }
+
+            return;
+        }
+
+        if (animationIndex == EFFECT_GLITCH &&
+                glitchIntensity > 0.01F) {
+
+            int availableHeight = Math.max(1, panelH - 16);
+            float easedProgress = smootherstep(progress);
+
+            for (int i = 0; i < 5; i++) {
+
+                float bandPosition = 0.10F + i * 0.16F
+                        + easedProgress * 0.12F;
+                int bandY = y + 8
+                        + Math.round(bandPosition * availableHeight);
+                float sliceWave = (float) Math.sin(
+                        (progress * 1.6F + i * 0.23F)
+                                * Math.PI * 2.0
+                );
+                int shift = Math.round(
+                        sliceWave * glitchIntensity * (4 + i * 2)
+                );
+                int left = x + Math.max(0, shift);
+                int right = x + PANEL_W - Math.max(0, -shift);
+                int color = i % 2 == 0 ? Ui.ACCENT_SOFT : Ui.ACCENT_2;
+
+                context.fill(
+                        left,
+                        bandY,
+                        right,
+                        bandY + 2 + i % 2,
+                        Ui.argb(color, glitchIntensity * 0.48F)
+                );
+            }
+        }
+    }
+
+    private static float componentAlpha(float progress, float delay) {
+        return smootherstep((progress - delay) / (1.0F - delay));
+    }
+
+    private static float staggeredProgress(
+            float progress,
+            int order,
+            float stagger
+    ) {
+        float delay = order * stagger;
+        return smootherstep((progress - delay) / (1.0F - delay));
+    }
+
+    private static float smootherstep(float value) {
+        float t = Ui.clamp01(value);
+        return t * t * t * (t * (t * 6.0F - 15.0F) + 10.0F);
     }
 
     /**
@@ -235,9 +514,11 @@ public final class ModeratorHud {
         );
 
         // live dot: it breathes so it is obvious the panel is active
-        float pulse = 0.55F + 0.45F * Ui.wave(
-                (System.currentTimeMillis() % 2000L) / 2000.0F
-        );
+        float pulse = Ui.animationsEnabled()
+                ? 0.55F + 0.45F * Ui.wave(
+                        (System.currentTimeMillis() % 2000L) / 2000.0F
+                )
+                : 1f;
 
         int dotX = x + PANEL_W - PAD - 5;
         int dotY = headY + HEAD_SIZE / 2 - 2;
@@ -300,39 +581,58 @@ public final class ModeratorHud {
         return client.textRenderer;
     }
 
-    /**
-     * Advances the fade animation. Returns false when there is nothing
-     * left to draw.
-     */
+    /** Advances the transition and its chat-open effect cycle. */
     private boolean tick(boolean chatOpen) {
 
         long now = System.currentTimeMillis();
-
-        float dt = lastFrame == 0L
-                ? 0.0F
-                : Math.min(0.1F, (now - lastFrame) / 1000.0F);
-
-        lastFrame = now;
-
-        float target = chatOpen ? 1.0F : 0.0F;
-
         float before = shown;
 
-        shown += (target - shown) * Math.min(1.0F, dt * 9.0F);
+        if (!chatStateInitialized) {
+            chatStateInitialized = true;
+            lastChatOpen = chatOpen;
+            beginTransition(chatOpen, now);
+            if (chatOpen) {
+                advanceAnimation();
+            }
+        } else if (chatOpen != lastChatOpen) {
+            lastChatOpen = chatOpen;
+            beginTransition(chatOpen, now);
+            advanceAnimation();
+        }
 
-        if (Math.abs(target - shown) < 0.01F) {
-            shown = target;
+        transitionProgress = Ui.animationProgress(
+                transitionStartedAt,
+                TRANSITION_DURATION_MS
+        );
+        float easedProgress = smootherstep(transitionProgress);
+        shown = transitionStartShown
+                + (transitionTarget - transitionStartShown) * easedProgress;
+
+        if (transitionProgress >= 1.0F) {
+            shown = transitionTarget;
         }
 
         if (chatOpen) {
             tickSession();
         }
 
-        if (shown <= 0.0F && target == 0.0F) {
+        if (shown <= 0.0F && transitionTarget == 0.0F &&
+                transitionProgress >= 1.0F) {
             return false;
         }
 
         return before != shown || shown > 0.0F;
+    }
+
+    private void beginTransition(boolean opening, long now) {
+        transitionOpening = opening;
+        transitionStartShown = shown;
+        transitionTarget = opening ? 1.0F : 0.0F;
+        transitionStartedAt = now;
+    }
+
+    private void advanceAnimation() {
+        animationIndex = (animationIndex + 1) % EFFECT_COUNT;
     }
 
     /** New session after login or after a server change. */
@@ -449,7 +749,8 @@ public final class ModeratorHud {
 
         long now = System.currentTimeMillis();
 
-        if (phraseIndexAt < 0L || now - phraseIndexAt > 12_000L) {
+        if (phraseIndexAt < 0L ||
+                Ui.animationsEnabled() && now - phraseIndexAt > 12_000L) {
 
             phraseIndexAt = now;
             phraseIndex = (phraseIndex + 1) % PHRASES.length;
@@ -623,9 +924,9 @@ public final class ModeratorHud {
     /** Hit area of the whole panel, used while dragging. */
     private int panelHeight() {
 
-        return PAD + HEAD_SIZE + 4 + 4 * (LINE_H + 3) + 5
+        return PAD + HEAD_SIZE + 8 + 4 * (LINE_H + 4)
                 + (StafftoolsClient.getConfig().isModHudPhrases()
-                        ? phrase().length * (LINE_H + 1)
+                        ? phrase().length * (LINE_H + 1) + 8
                         : 0) + PAD;
     }
 
@@ -638,10 +939,18 @@ public final class ModeratorHud {
         return Math.max(min, Math.min(max, value));
     }
 
-    /** Drops the fade state, e.g. on disconnect. */
+    /** Drops transition state, e.g. on disconnect. */
     public void reset() {
 
         shown = 0.0F;
+        chatStateInitialized = false;
+        lastChatOpen = false;
+        transitionOpening = false;
+        animationIndex = -1;
+        transitionStartedAt = 0L;
+        transitionStartShown = 0.0F;
+        transitionTarget = 0.0F;
+        transitionProgress = 0.0F;
         dragging = false;
         placed = false;
         sessionStart = -1L;

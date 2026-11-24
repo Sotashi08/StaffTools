@@ -1,6 +1,9 @@
 package com.uwdie.stafftools.client.chat;
 
 import com.uwdie.stafftools.client.StafftoolsClient;
+import com.uwdie.stafftools.client.audit.AuditCategory;
+import com.uwdie.stafftools.client.audit.AuditLog;
+import com.uwdie.stafftools.client.audit.Profiler;
 import com.uwdie.stafftools.client.config.StaffToolsConfig;
 import com.uwdie.stafftools.client.player.PlayerContext;
 import com.uwdie.stafftools.client.player.PlayerResolver;
@@ -8,22 +11,35 @@ import com.uwdie.stafftools.client.player.PlayerResolver;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Detects player mentions inside a plain chat string.
  *
- * Layers, in order (each one can be switched off in the detection menu):
- * 1. real nicks from the tab list,
- * 2. nicks from the local cache of everyone seen this session,
- * 3. the same two after folding look-alike unicode
- *    ("\u1D04ᴀᴘꜱ" -> "caps"),
- * 4. the same two after replacing decorations with spaces
- *    ("[VIP]Notch\u2605" -> " VIP Notch "),
- * 5. the same two after stripping legacy colour codes
- *    ("\u00A7aPl\u00A7fayer" -> "Player"),
- * 6. aliases learned from click / hover events,
- * 7. nicks learned from a /nick change (EssentialsX), where the tab list
- *    shows the new name while the real one is nowhere in the text.
+ * <p>Only layers that are reliable in practice are kept. Each one is
+ * independently switchable in the detection menu, and every layer that
+ * produced a hit is reported to the audit journal so a moderator can see
+ * <em>why</em> a nick was recognised.
+ *
+ * <ol>
+ *   <li>real nicks from the tab list,</li>
+ *   <li>nicks from the local cache of everyone seen this session,</li>
+ *   <li>the same two after folding look-alike unicode
+ *       ("\u1D04ᴀᴘꜱ" -> "caps"),</li>
+ *   <li>the same two after replacing decorations with spaces
+ *       ("[VIP]Notch\u2605" -> " VIP Notch "),</li>
+ *   <li>the same two after stripping legacy colour codes
+ *       ("\u00A7aPl\u00A7fayer" -> "Player"),</li>
+ *   <li>nicks learned from a /nick change (EssentialsX), where the tab
+ *       list shows the new name while the real one is nowhere in the
+ *       text,</li>
+ *   <li>aliases learned from click / hover events, as the loosest
+ *       fallback.</li>
+ * </ol>
+ *
+ * <p>The typo-tolerant layer was removed: a one-edit match against the
+ * whole session cache turned ordinary chat words into false positives,
+ * which is worse than missing a misspelled nick.
  */
 public final class PlayerMentionDetector {
 
@@ -38,6 +54,22 @@ public final class PlayerMentionDetector {
             return List.of();
         }
 
+        long startedAt = System.nanoTime();
+
+        try {
+            return detectInternal(message);
+        } finally {
+            Profiler.get().record(
+                    Profiler.DETECT,
+                    System.nanoTime() - startedAt
+            );
+        }
+    }
+
+    private static List<PlayerMention> detectInternal(
+            String message
+    ) {
+
         StaffToolsConfig config =
                 StafftoolsClient.getConfig();
 
@@ -48,11 +80,15 @@ public final class PlayerMentionDetector {
         List<PlayerMention> all = new ArrayList<>();
 
         // 1. real nicks from the tab list and the session cache
-        all.addAll(findIn(message));
+        List<PlayerMention> plain = findIn(message);
+        all.addAll(plain);
 
         // 2. players known only under a nick they changed to
+        List<PlayerMention> renamed = List.of();
+
         if (config.isDetectAliases()) {
-            all.addAll(findRenamed(message));
+            renamed = findRenamed(message);
+            all.addAll(renamed);
         }
 
         // 3. the same two after folding look-alike unicode
@@ -81,19 +117,131 @@ public final class PlayerMentionDetector {
         all.addAll(detectStripped(message));
         all.addAll(detectStrippedRenamed(message));
 
-        List<PlayerMention> merged = merge(all);
+        boolean disableNickHighlight =
+                config.isNickHighlightDisabled();
+        List<PlayerMention> merged = merge(
+                all,
+                disableNickHighlight
+        );
 
         if (!merged.isEmpty()) {
+
+            auditLayers(plain, renamed, merged);
+
             return merged;
         }
 
         // 6. aliases learned from click / hover events, used as a
         //    fallback: they are the loosest layer
         if (config.isDetectAliases()) {
-            return NickAliases.detect(message);
+
+            List<PlayerMention> aliases = NickAliases.detect(message);
+
+            if (!aliases.isEmpty()) {
+
+                AuditLog.get().info(
+                        AuditCategory.DETECT,
+                        "Matched via learned alias: "
+                                + aliases.get(0).player().name()
+                );
+            }
+
+            return applyNickHighlightSetting(
+                    aliases,
+                    disableNickHighlight
+            );
         }
 
         return List.of();
+    }
+
+    /**
+     * Reports which layers contributed to a successful detection, so the
+     * audit journal explains the result instead of only stating it.
+     */
+    private static void auditLayers(
+            List<PlayerMention> plain,
+            List<PlayerMention> renamed,
+            List<PlayerMention> merged
+    ) {
+
+        StringBuilder layers = new StringBuilder();
+
+        if (!plain.isEmpty()) {
+            layers.append("tab/cache");
+        }
+
+        if (!renamed.isEmpty()) {
+            layers.append(layers.length() > 0 ? "+nick" : "nick");
+        }
+
+        if (layers.length() == 0) {
+            layers.append("folded");
+        }
+
+        AuditLog.get().info(
+                AuditCategory.DETECT,
+                "Layer " + layers + " matched "
+                        + merged.size() + " nick(s)"
+        );
+    }
+
+    /**
+     * Runs the full detection and reports the outcome to the audit
+     * journal. Used by the chat pipeline, where "no nick found" is just
+     * as interesting as a hit.
+     */
+    public static List<PlayerMention> detectAndAudit(
+            String message
+    ) {
+
+        List<PlayerMention> mentions = detect(message);
+
+        if (mentions.isEmpty()) {
+
+            AuditLog.get().info(
+                    AuditCategory.DETECT,
+                    "No nick detected in: " + preview(message)
+            );
+
+            return mentions;
+        }
+
+        StringBuilder names = new StringBuilder();
+
+        for (PlayerMention mention : mentions) {
+
+            if (names.length() > 0) {
+                names.append(", ");
+            }
+
+            names.append(mention.player().name());
+
+            if (!mention.highlight()) {
+                names.append(" (nick)");
+            }
+        }
+
+        AuditLog.get().success(
+                AuditCategory.DETECT,
+                "Detected " + names + " in: " + preview(message)
+        );
+
+        return mentions;
+    }
+
+    /** Short, single-line excerpt of a chat message for the journal. */
+    private static String preview(String message) {
+
+        if (message == null) {
+            return "";
+        }
+
+        String flat = message.replace('\n', ' ').trim();
+
+        return flat.length() <= 60
+                ? flat
+                : flat.substring(0, 57) + "...";
     }
 
     /**
@@ -106,14 +254,21 @@ public final class PlayerMentionDetector {
      * nick is never chopped by a shorter match inside it.
      */
     private static List<PlayerMention> merge(
-            List<PlayerMention> mentions
+            List<PlayerMention> mentions,
+            boolean disableNickHighlight
     ) {
 
-        if (mentions.size() < 2) {
-            return mentions;
+        List<PlayerMention> adjusted =
+                applyNickHighlightSetting(
+                        mentions,
+                        disableNickHighlight
+                );
+
+        if (adjusted.size() < 2) {
+            return adjusted;
         }
 
-        List<PlayerMention> sorted = new ArrayList<>(mentions);
+        List<PlayerMention> sorted = new ArrayList<>(adjusted);
 
         // longest first so that, at the same position, the widest range
         // is considered before the narrow ones
@@ -171,19 +326,57 @@ public final class PlayerMentionDetector {
         return result;
     }
 
+    static List<PlayerMention> applyNickHighlightSetting(
+            List<PlayerMention> mentions,
+            boolean disableNickHighlight
+    ) {
+
+        if (mentions.isEmpty() ||
+                !disableNickHighlight) {
+
+            return mentions;
+        }
+
+        List<PlayerMention> adjusted = null;
+
+        for (int i = 0; i < mentions.size(); i++) {
+
+            PlayerMention mention = mentions.get(i);
+
+            if (!mention.highlight()) {
+                continue;
+            }
+
+            if (adjusted == null) {
+                adjusted = new ArrayList<>(mentions);
+            }
+
+            adjusted.set(
+                    i,
+                    new PlayerMention(
+                            mention.player(),
+                            mention.start(),
+                            mention.end(),
+                            false
+                    )
+            );
+        }
+
+        return adjusted == null ? mentions : adjusted;
+    }
+
     /**
- * Mentions of players known only under a nick they changed to.
- *
- * These are NOT highlighted: the word belongs to somebody's sentence and
- * repainting it would turn unrelated chat words yellow.
- */
+     * Mentions of players known only under a changed nick.
+     */
     private static List<PlayerMention> findRenamed(
             String message
     ) {
 
         List<PlayerMention> mentions = new ArrayList<>();
 
-        String lower = message.toLowerCase();
+        String lower = message.toLowerCase(Locale.ROOT);
+        boolean highlight = !StafftoolsClient.getConfig()
+                .isNickHighlightDisabled();
 
         for (PlayerContext player :
                 EssentialsNickTracker.get().findIn(message)) {
@@ -218,7 +411,7 @@ public final class PlayerMentionDetector {
                                     player,
                                     index,
                                     end,
-                                    false
+                                    highlight
                             )
                     );
                 }
@@ -240,7 +433,7 @@ public final class PlayerMentionDetector {
                 EssentialsNickTracker.get()
                         .nicksOf(player)) {
 
-            if (message.toLowerCase().contains(nick)) {
+            if (message.toLowerCase(Locale.ROOT).contains(nick)) {
                 return nick;
             }
         }
@@ -424,7 +617,8 @@ private static List<PlayerMention> remap(
                 new PlayerMention(
                         m.player(),
                         map[m.start()],
-                        map[m.end() - 1] + 1
+                        map[m.end() - 1] + 1,
+                        m.highlight()
                 )
         );
     }

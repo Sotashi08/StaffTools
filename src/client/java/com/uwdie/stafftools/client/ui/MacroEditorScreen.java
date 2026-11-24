@@ -3,6 +3,7 @@ package com.uwdie.stafftools.client.ui;
 import com.uwdie.stafftools.client.StafftoolsClient;
 import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
+import com.uwdie.stafftools.client.macro.CommandPreview;
 import com.uwdie.stafftools.client.macro.Macro;
 import com.uwdie.stafftools.client.macro.Placeholder;
 import com.uwdie.stafftools.client.macro.PlaceholderRegistry;
@@ -40,6 +41,7 @@ public class MacroEditorScreen extends StScreen {
 
     private int left;
     private int inner;
+    private int bodyTop;
     private int panelBottom;
 
     private int panelX;
@@ -55,15 +57,24 @@ public class MacroEditorScreen extends StScreen {
     private final List<String> workingAliases =
             new java.util.ArrayList<>();
 
+    /** Row height of one alias card. */
+    private static final int ALIAS_ROW_H = 16;
+    private static final int CHIP_ROW_STEP = 22;
+
+    /** Drag-to-reorder state of the alias list. */
+    private final DragReorder aliasDrag = new DragReorder();
+
     private int aliasScroll;
     private int aliasPanelX;
-    private int aliasPanelW = 140;
-    private int aliasListTop = 84;
+    private int aliasPanelW = 124;
+    private int aliasListTop = 0;
+    private int aliasListCapacity;
     private int aliasListVisible;
     private StTextField aliasField;
 
     // placeholder info panel (right side)
     private static final int INFO_W = 160;
+    private int infoPanelW = INFO_W;
     private int infoPanelX;
 
     private record Chip(
@@ -103,8 +114,29 @@ public class MacroEditorScreen extends StScreen {
 
         resetSlots();
 
-        panelW = Math.min(formWidth(), 330);
-        panelX = (width - panelW) / 2;
+        configureShell();
+        chips.clear();
+        bodyTop = contentTop() + 28;
+
+        int totalWidth = contentWidth();
+        int gap = 8;
+
+        if (totalWidth >= 500) {
+            aliasPanelW = 124;
+            infoPanelW = INFO_W;
+        } else if (totalWidth >= 320) {
+            aliasPanelW = Math.min(104, totalWidth / 4);
+            infoPanelW = 0;
+        } else {
+            aliasPanelW = Math.min(72, totalWidth / 4);
+            infoPanelW = 0;
+        }
+
+        panelW = Math.max(
+                1,
+                totalWidth - aliasPanelW - infoPanelW - gap * 2
+        );
+        panelX = contentLeft() + aliasPanelW + gap;
 
         left = panelX + 14;
         inner = panelW - 28;
@@ -119,7 +151,7 @@ public class MacroEditorScreen extends StScreen {
                         (editing.isDangerous() ||
                                 editing.isConfirmationRequired());
 
-        nameY = 50;
+        nameY = bodyTop + 16;
         descY = nameY + 38;
         cmdY = descY + 38;
 
@@ -152,7 +184,7 @@ public class MacroEditorScreen extends StScreen {
                         cmdY,
                         24,
                         20,
-                        Text.literal("😀"),
+                        Text.literal("\uD83D\uDE00"),
                         button -> toggleEmoji(),
                         nextSlot(),
                         Ui.ACCENT
@@ -214,6 +246,10 @@ public class MacroEditorScreen extends StScreen {
                 chipW,
                 textRenderer.getWidth("<alias>") + 10
         );
+        chipW = Math.min(
+                chipW,
+                Math.max(1, (inner - 4) / 2)
+        );
 
         int step = chipW + 4;
 
@@ -231,7 +267,7 @@ public class MacroEditorScreen extends StScreen {
             String tooltip = (String) def[1];
 
             int bx = left + col * step;
-            int by = chipsY + row * 24;
+            int by = chipsY + row * CHIP_ROW_STEP;
 
             chips.add(
                     new Chip(
@@ -265,24 +301,20 @@ public class MacroEditorScreen extends StScreen {
         }
 
         // aliases side panel
+        workingAliases.clear();
         if (editing != null) {
             workingAliases.addAll(editing.getAliases());
         }
 
-        aliasPanelX = Math.max(
-                4,
-                panelX - 10 - aliasPanelW
-        );
+        aliasPanelX = contentLeft();
 
-        infoPanelX = Math.min(
-                width - INFO_W - 4,
-                panelX + panelW + 10
-        );
+        aliasListTop = bodyTop + 46;
+        infoPanelX = panelX + panelW + gap;
 
         aliasField = new StTextField(
                 textRenderer,
                 aliasPanelX + 6,
-                56,
+                bodyTop + 22,
                 aliasPanelW - 32,
                 20,
                 Text.empty(),
@@ -298,7 +330,7 @@ public class MacroEditorScreen extends StScreen {
         addDrawableChild(
                 new StButton(
                         aliasPanelX + aliasPanelW - 24,
-                        56,
+                        bodyTop + 22,
                         18,
                         20,
                         Text.literal("+"),
@@ -316,10 +348,13 @@ public class MacroEditorScreen extends StScreen {
                 )
         );
 
-        int buttonsY =
-                chipsY + (row + 1) * 24 + 6;
+        int chipRows = row + (col > 0 ? 1 : 0);
+        int buttonsY = Math.min(
+                chipsY + chipRows * CHIP_ROW_STEP + 4,
+                contentBottom() - 28
+        );
 
-        panelBottom = buttonsY + 34;
+        panelBottom = buttonsY + 26;
 
         button(
                 left,
@@ -448,6 +483,13 @@ public class MacroEditorScreen extends StScreen {
         StafftoolsClient.getMacroManager()
                 .register(editing);
 
+        com.uwdie.stafftools.client.audit.AuditLog.get()
+                .info(
+                        com.uwdie.stafftools.client.audit
+                                .AuditCategory.CONFIG,
+                        "Macro saved: " + editing.getName()
+                );
+
         client.setScreen(
                 parent instanceof StafftoolsScreen
                         ? new StafftoolsScreen()
@@ -469,12 +511,13 @@ public class MacroEditorScreen extends StScreen {
             return true;
         }
 
-        // alias list rows: ✕ deletes, rest of the row is inert
+        // alias list rows: the cross deletes, the rest of the row
+        // starts a drag-to-reorder
         if (button == 0 &&
                 isInsideAliasList(mouseX, mouseY)) {
 
             int index = aliasScroll + (int)
-                    ((mouseY - aliasListTop) / 16);
+                    ((mouseY - aliasListTop) / ALIAS_ROW_H);
 
             if (index >= 0 &&
                     index < workingAliases.size()) {
@@ -485,6 +528,19 @@ public class MacroEditorScreen extends StScreen {
                         rx <= aliasPanelX + aliasPanelW - 6) {
 
                     workingAliases.remove(index);
+                    aliasScroll = Math.min(
+                            aliasScroll,
+                            Math.max(
+                                    0,
+                                    workingAliases.size()
+                                            - aliasListCapacity
+                            )
+                    );
+
+                } else {
+
+                    // anywhere else on the row arms a reorder drag
+                    aliasDrag.press(index, mouseY);
                 }
             }
 
@@ -492,6 +548,49 @@ public class MacroEditorScreen extends StScreen {
         }
 
         return super.mouseClicked(click, doubled);
+    }
+
+    @Override
+    public boolean mouseDragged(
+            Click click,
+            double offsetX,
+            double offsetY
+    ) {
+
+        if (aliasDrag.drag(
+                click.y(),
+                aliasListTop,
+                ALIAS_ROW_H,
+                workingAliases.size(),
+                aliasScroll * ALIAS_ROW_H
+        )) {
+
+            return true;
+        }
+
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+
+        int to = aliasDrag.targetIndex();
+
+        int from = aliasDrag.release();
+
+        if (from >= 0 && to >= 0 &&
+                from != to &&
+                from < workingAliases.size() &&
+                to < workingAliases.size()) {
+
+            String moved = workingAliases.remove(from);
+
+            workingAliases.add(to, moved);
+
+            Ui.playHover();
+        }
+
+        return super.mouseReleased(click);
     }
 
     @Override
@@ -506,7 +605,7 @@ public class MacroEditorScreen extends StScreen {
 
             int maxScroll = Math.max(
                     0,
-                    workingAliases.size() - aliasListVisible
+                    workingAliases.size() - aliasListCapacity
             );
 
             aliasScroll = Math.clamp(
@@ -536,7 +635,7 @@ public class MacroEditorScreen extends StScreen {
                 mouseX <= aliasPanelX + aliasPanelW &&
                 mouseY >= aliasListTop &&
                 mouseY < aliasListTop
-                        + aliasListVisible * 16;
+                        + aliasListVisible * ALIAS_ROW_H;
     }
 
     @Override
@@ -551,21 +650,30 @@ public class MacroEditorScreen extends StScreen {
         Ui.drawPanel(
                 context,
                 panelX,
-                34,
+                bodyTop - 4,
                 panelW,
-                panelBottom - 34,
+                panelBottom - bodyTop + 4,
                 alpha
         );
         Ui.drawOrbitFrame(
                 context,
                 panelX,
-                34,
+                bodyTop - 4,
                 panelW,
-                panelBottom - 34,
+                panelBottom - bodyTop + 4,
                 alpha
         );
 
-        drawTitle(context, titleKey, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\u270E",
+                Lang.t(titleKey),
+                Lang.t(Key.MSG_EDITOR_HINT),
+                alpha
+        );
 
         context.drawTextWithShadow(
                 textRenderer,
@@ -591,14 +699,15 @@ public class MacroEditorScreen extends StScreen {
                 Ui.argb(Ui.TEXT_DIM, alpha)
         );
 
-        int hintWidth =
-                textRenderer.getWidth(
-                        Lang.text(Key.MSG_EMOJI_HINT)
-                );
+        String hint = textRenderer.trimToWidth(
+                Lang.t(Key.MSG_EMOJI_HINT),
+                Math.max(1, inner - 4)
+        );
+        int hintWidth = textRenderer.getWidth(hint);
 
         context.drawTextWithShadow(
                 textRenderer,
-                Lang.text(Key.MSG_EMOJI_HINT),
+                Text.literal(hint),
                 left + inner - hintWidth,
                 toggleY - 12,
                 Ui.argb(Ui.TEXT_MUTED, alpha)
@@ -614,43 +723,52 @@ public class MacroEditorScreen extends StScreen {
 
         // aliases side panel (height capped to its content)
         int aliasPanelBottom = Math.min(
-                panelBottom - 6,
-                aliasListTop + 8 * 16 + 12
+                Math.min(panelBottom - 6, contentBottom() - 4),
+                aliasListTop + 8 * ALIAS_ROW_H + 12
         );
 
         Ui.drawPanel(
                 context,
                 aliasPanelX,
-                34,
+                bodyTop,
                 aliasPanelW,
-                aliasPanelBottom - 34,
+                aliasPanelBottom - bodyTop,
                 alpha
         );
         Ui.drawOrbitFrame(
                 context,
                 aliasPanelX,
-                34,
+                bodyTop,
                 aliasPanelW,
-                aliasPanelBottom - 34,
+                aliasPanelBottom - bodyTop,
                 alpha
         );
 
-        context.drawCenteredTextWithShadow(
+        Ui.drawSectionHeader(
+                context,
                 textRenderer,
-                Lang.text(Key.LABEL_ALIASES),
-                aliasPanelX + aliasPanelW / 2,
-                40,
-                Ui.argb(Ui.TEXT_DIM, alpha)
+                aliasPanelX + 6,
+                bodyTop + 5,
+                aliasPanelW - 12,
+                Lang.t(Key.LABEL_ALIASES),
+                alpha
         );
 
         int maxVisible = Math.max(
                 0,
-                (aliasPanelBottom - 12 - aliasListTop) / 16
+                (aliasPanelBottom - 12 - aliasListTop)
+                        / ALIAS_ROW_H
         );
 
+        aliasListCapacity = maxVisible;
+        aliasScroll = Math.clamp(
+                aliasScroll,
+                0,
+                Math.max(0, workingAliases.size() - aliasListCapacity)
+        );
         aliasListVisible = Math.min(
-                workingAliases.size(),
-                maxVisible
+                aliasListCapacity,
+                workingAliases.size() - aliasScroll
         );
 
         for (int i = 0; i < aliasListVisible; i++) {
@@ -658,13 +776,13 @@ public class MacroEditorScreen extends StScreen {
             String alias =
                     workingAliases.get(aliasScroll + i);
 
-            int ry = aliasListTop + i * 16;
+            int ry = aliasListTop + i * ALIAS_ROW_H;
 
             context.fill(
                     aliasPanelX + 4,
                     ry,
                     aliasPanelX + aliasPanelW - 4,
-                    ry + 14,
+                    ry + ALIAS_ROW_H - 2,
                     Ui.argb(Ui.PANEL_BG_SOFT, alpha)
             );
 
@@ -685,7 +803,7 @@ public class MacroEditorScreen extends StScreen {
                     mouseX >= aliasPanelX + aliasPanelW - 22 &&
                             mouseX <= aliasPanelX + aliasPanelW - 6 &&
                             mouseY >= ry &&
-                            mouseY < ry + 14;
+                            mouseY < ry + ALIAS_ROW_H - 2;
 
             if (xHovered) {
 
@@ -693,14 +811,14 @@ public class MacroEditorScreen extends StScreen {
                         aliasPanelX + aliasPanelW - 22,
                         ry,
                         aliasPanelX + aliasPanelW - 6,
-                        ry + 14,
+                        ry + ALIAS_ROW_H - 2,
                         Ui.argb(0xFF8A2B2B, alpha)
                 );
             }
 
             context.drawCenteredTextWithShadow(
                     textRenderer,
-                    Text.literal("✕"),
+                    Text.literal("\u2715"),
                     aliasPanelX + aliasPanelW - 14,
                     ry + 2,
                     Ui.argb(
@@ -713,12 +831,179 @@ public class MacroEditorScreen extends StScreen {
         // placeholder info panel (right side), shown on chip hover
         Chip hoveredChip = getHoveredChip(mouseX, mouseY);
 
-        if (hoveredChip != null) {
-            drawInfoPanel(
-                    context,
-                    hoveredChip,
-                    alpha
+        drawSidePanel(
+                context,
+                hoveredChip,
+                alpha
+        );
+    }
+
+    /**
+     * Right-hand panel: the live command preview on top, and the
+     * placeholder description underneath while a chip is hovered.
+     */
+    private void drawSidePanel(
+            DrawContext context,
+            Chip hoveredChip,
+            float alpha
+    ) {
+
+        int top = bodyTop - 4;
+        if (infoPanelW <= 0) {
+            return;
+        }
+
+        int bottom = Math.max(top + 60, panelBottom);
+
+        Ui.drawPanel(
+                context,
+                infoPanelX,
+                top,
+                infoPanelW,
+                bottom - top,
+                alpha
+        );
+        Ui.drawOrbitFrame(
+                context,
+                infoPanelX,
+                top,
+                infoPanelW,
+                bottom - top,
+                alpha
+        );
+
+        // accent header strip
+        Ui.drawGradientH(
+                context,
+                infoPanelX + 3,
+                top + 1,
+                infoPanelW - 6,
+                2,
+                Ui.ACCENT,
+                Ui.ACCENT_2,
+                alpha
+        );
+
+        int y = top + 10;
+
+        context.drawTextWithShadow(
+                textRenderer,
+                Lang.text(Key.PREVIEW_TITLE),
+                infoPanelX + 8,
+                y,
+                Ui.argb(Ui.ACCENT_SOFT, alpha)
+        );
+
+        y += 14;
+
+        String command = commandField == null
+                ? ""
+                : commandField.getText();
+
+        String preview = CommandPreview.resolve(
+                command,
+                workingAliases.isEmpty()
+                        ? null
+                        : workingAliases.get(0)
+        );
+
+        if (preview.isEmpty()) {
+
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Lang.text(Key.PREVIEW_EMPTY),
+                    infoPanelX + 8,
+                    y,
+                    Ui.argb(Ui.TEXT_MUTED, alpha)
             );
+
+            y += 12;
+
+        } else {
+
+            List<String> lines = wrapAll(
+                    textRenderer,
+                    preview,
+                    infoPanelW - 16,
+                    6
+            );
+
+            for (String line : lines) {
+
+                context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(line),
+                        infoPanelX + 8,
+                        y,
+                        Ui.argb(Ui.TEXT, alpha)
+                );
+
+                y += 10;
+            }
+
+            y += 2;
+        }
+
+        // example caption
+        context.drawTextWithShadow(
+                textRenderer,
+                Lang.text(Key.PREVIEW_EXAMPLE),
+                infoPanelX + 8,
+                y,
+                Ui.argb(Ui.TEXT_MUTED, alpha * 0.9f)
+        );
+
+        y += 12;
+
+        if (hoveredChip != null) {
+
+            Ui.drawHeader(
+                    context,
+                    infoPanelX + 8,
+                    y,
+                    infoPanelW - 16,
+                    alpha * 0.6f
+            );
+
+            y += 6;
+
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(hoveredChip.tag()),
+                    infoPanelX + 8,
+                    y,
+                    Ui.argb(Ui.ACCENT_SOFT, alpha)
+            );
+
+            y += 12;
+
+            int maxLines = Math.max(
+                    1,
+                    (bottom - y - 6) / 11
+            );
+
+            for (String line : wrapAll(
+                    textRenderer,
+                    hoveredChip.tooltip(),
+                    infoPanelW - 16,
+                    maxLines
+            )) {
+
+                if (line.isEmpty()) {
+                    y += 6;
+                    continue;
+                }
+
+                context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(line),
+                        infoPanelX + 8,
+                        y,
+                        Ui.argb(Ui.TEXT_DIM, alpha)
+                );
+
+                y += 11;
+            }
         }
     }
 
@@ -739,91 +1024,6 @@ public class MacroEditorScreen extends StScreen {
         }
 
         return null;
-    }
-
-    private void drawInfoPanel(
-            DrawContext context,
-            Chip chip,
-            float alpha
-    ) {
-
-        int top = 34;
-        int bottom = Math.max(
-                top + 60,
-                panelBottom
-        );
-
-        Ui.drawPanel(
-                context,
-                infoPanelX,
-                top,
-                INFO_W,
-                bottom - top,
-                alpha
-        );
-        Ui.drawOrbitFrame(
-                context,
-                infoPanelX,
-                top,
-                INFO_W,
-                bottom - top,
-                alpha
-        );
-
-        // accent header strip
-        Ui.drawGradientH(
-                context,
-                infoPanelX + 3,
-                top + 1,
-                INFO_W - 6,
-                2,
-                Ui.ACCENT,
-                Ui.ACCENT_2,
-                alpha
-        );
-
-        String tag = "<alias>".equals(chip.tag())
-                ? "<alias>"
-                : chip.tag();
-
-        context.drawTextWithShadow(
-                textRenderer,
-                Text.literal(tag),
-                infoPanelX + 8,
-                top + 12,
-                Ui.argb(Ui.ACCENT_SOFT, alpha)
-        );
-
-        int maxLines =
-                (bottom - top - 34) / 11;
-
-        List<String> lines = wrapAll(
-                textRenderer,
-                chip.tooltip(),
-                INFO_W - 16,
-                maxLines
-        );
-
-        int y = top + 30;
-
-        for (String line : lines) {
-
-            if (line.isEmpty()) {
-
-                y += 6;
-                continue;
-            }
-
-            context.drawTextWithShadow(
-                    textRenderer,
-                    Text.literal(line),
-                    infoPanelX + 8,
-                    y,
-                    Ui.argb(Ui.TEXT_DIM, alpha)
-            );
-
-            y += 11;
-        }
     }
 
     /** Word wrap without a line cap (panel handles overflow). */

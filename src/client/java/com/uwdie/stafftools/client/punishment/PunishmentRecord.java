@@ -5,7 +5,7 @@ package com.uwdie.stafftools.client.punishment;
  */
 public class PunishmentRecord {
 
-    public static final long RESPONSE_TIMEOUT_MS = 30_000;
+    public static final long RESPONSE_TIMEOUT_MS = 60_000;
 
     private String playerName;
     private PunishmentType type;
@@ -16,6 +16,9 @@ public class PunishmentRecord {
 
     /** Raw address of the server the punishment was issued on. */
     private String serverKey = "";
+
+    /** Correlation ID to match command with response across retries. */
+    private String correlationId;
 
     /** Local staff member who issued the punishment. */
     private String moderator;
@@ -195,5 +198,14 @@ public class PunishmentRecord {
         return moderator == null || moderator.isBlank()
                 ? null
                 : moderator;
+    }
+
+    /** Correlation ID for matching command with server response. */
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
     }
 }

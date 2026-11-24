@@ -15,8 +15,8 @@ import net.minecraft.text.Text;
  */
 public class ServerRenameScreen extends StScreen {
 
-    private static final int LABEL_Y = 58;
-    private static final int FIELD_Y = 70;
+    private int LABEL_Y;
+    private int FIELD_Y;
 
     private final Screen parent;
     private final String key;
@@ -51,7 +51,7 @@ public class ServerRenameScreen extends StScreen {
                         (width - Math.min(220, formWidth())) / 2
                 ),
                 FIELD_Y,
-                Math.min(220, formWidth()),
+                Math.min(320, contentWidth()),
                 20,
                 Text.literal(current),
                 nextSlot()
@@ -71,7 +71,7 @@ public class ServerRenameScreen extends StScreen {
 
         button(
                 left,
-                height - 34,
+                contentBottom() - 26,
                 half,
                 22,
                 Key.BTN_CANCEL,
@@ -80,7 +80,7 @@ public class ServerRenameScreen extends StScreen {
 
         button(
                 left + half + 8,
-                height - 34,
+                contentBottom() - 26,
                 half,
                 22,
                 Key.BTN_SAVE,
@@ -140,7 +140,16 @@ public class ServerRenameScreen extends StScreen {
                 alpha
         );
 
-        drawTitle(context, Key.TITLE_SERVER_RENAME, alpha);
+        Ui.drawSectionTitle(
+                context,
+                textRenderer,
+                contentLeft(),
+                contentTop(),
+                "\u270E",
+                Lang.t(Key.TITLE_SERVER_RENAME),
+                Lang.t(Key.LABEL_SERVER_KEY),
+                alpha
+        );
 
         int left =
                 (width - Math.min(220, formWidth())) / 2;
