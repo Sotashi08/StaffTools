@@ -138,6 +138,12 @@ public final class DbCommand {
                                                 .executes(ctx -> {
                                                     export();
                                                     return 1;
+                                                }))
+                                        .then(ClientCommandManager
+                                                .literal("clearaudit")
+                                                .executes(ctx -> {
+                                                    clearAudit();
+                                                    return 1;
                                                 }))));
     }
 
@@ -461,6 +467,31 @@ public final class DbCommand {
     private static String csv(String s) {
         if (s == null) return "";
         return "\"" + s.replace("\"", "\"\"") + "\"";
+    }
+
+    private static void clearAudit() {
+
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        if (client.inGameHud == null) {
+            return;
+        }
+
+        Database db = Database.get();
+
+        if (db == null) {
+            msg("Database not initialized");
+            return;
+        }
+
+        try (var st = db.conn().createStatement()) {
+            st.execute("DELETE FROM audit");
+        } catch (Exception e) {
+            msg("Clear audit failed: " + e.getMessage());
+            return;
+        }
+
+        msg("Audit log cleared");
     }
 
     // ---- helpers ----
