@@ -44,8 +44,15 @@ public final class CommandPreview {
                         alias.trim()
                 );
 
+        // show a sample reason in the preview so <reason> is not left
+        // as a raw token while the user types the command
+        String withReason = withAlias.replace(
+                MacroExecutor.REASON_TOKEN,
+                "Причина"
+        );
+
         return PlaceholderEngine.resolve(
-                withAlias,
+                withReason,
                 sampleContext()
         ).replaceAll(" {2,}", " ").trim();
     }

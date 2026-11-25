@@ -40,11 +40,42 @@ public final class NickCache {
 
     private long lastCleanupAt = 0;
 
+    /** Nicks marked as ignored (from stdb output) — not logged to DB. */
+    private final java.util.Set<String> ignored =
+            java.util.Collections.synchronizedSet(
+                    new java.util.HashSet<>());
+
     private NickCache() {
     }
 
     public static NickCache get() {
         return INSTANCE;
+    }
+
+    /** Marks a nick as ignored (no DB/audit logging) but keeps it
+     *  resolvable so the actions popup still works. */
+    public void markIgnored(String name) {
+
+        if (name == null || name.isBlank()) {
+            return;
+        }
+
+        ignored.add(name.toLowerCase());
+
+        // add to cache so click-to-popup resolves, but skip DB write
+        String key = name.toLowerCase();
+
+        if (!nicks.containsKey(key)) {
+            nicks.put(
+                    key,
+                    new CachedNick(
+                            new PlayerContext(name, offlineUuid(name))));
+        }
+    }
+
+    /** True if the nick is marked as ignored. */
+    public boolean isIgnored(String name) {
+        return name != null && ignored.contains(name.toLowerCase());
     }
 
     /** Drops everything remembered from the current server session. */
@@ -74,6 +105,17 @@ public final class NickCache {
             return;
         }
 
+        // skip NPC / placeholder names that start with special chars
+        // (e.g. "#123", "%npc") — real Minecraft nicks start with a letter
+        if (!isValidNick(name)) {
+            return;
+        }
+
+        // skip nicks marked as ignored (from stdb output)
+        if (isIgnored(name)) {
+            return;
+        }
+
         String key = name.toLowerCase();
 
         CachedNick existing = nicks.get(key);
@@ -86,6 +128,18 @@ public final class NickCache {
                 key,
                 new CachedNick(new PlayerContext(name, offlineUuid(name)))
         );
+
+        // persist to DB for cross-session autocomplete
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db != null) {
+            db.upsertNick(
+                    name,
+                    offlineUuid(name).toString(),
+                    com.uwdie.stafftools.client.punishment
+                            .PunishmentHistory.currentServerKey());
+        }
 
         if (nicks.size() > MAX_ENTRIES) {
             evictOldest();
@@ -119,6 +173,65 @@ public final class NickCache {
                 remember(name);
             }
         }
+    }
+
+    /** True once the DB has been loaded into the in-memory cache. */
+    private boolean loadedFromDb;
+
+    /**
+     * Loads every nick stored in the database into the in-memory cache.
+     * Called lazily on first use so the hot path stays fast.
+     */
+    public void loadFromDatabase() {
+        loadFromDatabase(false);
+    }
+
+    /** Same, but {@code force} re-reads even if already loaded. */
+    public void loadFromDatabase(boolean force) {
+
+        if (loadedFromDb && !force) {
+            return;
+        }
+
+        loadedFromDb = true;
+
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db == null) {
+            return;
+        }
+
+        for (String name : db.allNicks()) {
+
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+
+            String key = name.toLowerCase();
+
+            if (!nicks.containsKey(key)) {
+                nicks.put(
+                        key,
+                        new CachedNick(
+                                new PlayerContext(name, offlineUuid(name)))
+                );
+            }
+        }
+    }
+
+    /** All nicks known to the mod (cache + DB), for autocomplete. */
+    public List<String> allKnownNicks() {
+
+        loadFromDatabase();
+
+        List<String> out = new ArrayList<>(nicks.size());
+
+        for (CachedNick cached : nicks.values()) {
+            out.add(cached.player.name());
+        }
+
+        return out;
     }
 
     /** Exact, case-insensitive lookup. */
@@ -310,5 +423,30 @@ public final class NickCache {
                 ("OfflinePlayer:" + name)
                         .getBytes(java.nio.charset.StandardCharsets.UTF_8)
         );
+    }
+
+    /**
+     * True for plausible Minecraft nicks: 3–16 chars, start with a
+     * letter, contain only letters/digits/underscore. Rejects NPC and
+     * placeholder names that begin with special chars (#, %, ...).
+     */
+    private static boolean isValidNick(String name) {
+
+        if (name.length() < 3 || name.length() > 16) {
+            return false;
+        }
+
+        if (!Character.isLetter(name.charAt(0))) {
+            return false;
+        }
+
+        for (int i = 1; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

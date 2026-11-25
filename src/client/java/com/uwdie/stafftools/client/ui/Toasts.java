@@ -164,6 +164,14 @@ public final class Toasts {
                         System.currentTimeMillis()
                 )
         );
+
+        // distinct cue per notification kind
+        switch (kind) {
+            case SUCCESS -> UiSound.success();
+            case WARN -> UiSound.warn();
+            case DANGER -> UiSound.danger();
+            case INFO -> UiSound.tick();
+        }
     }
 
     /**

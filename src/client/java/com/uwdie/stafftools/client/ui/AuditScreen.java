@@ -21,8 +21,8 @@ import java.util.List;
  * Debug screen with two panels: the audit journal on the left and the
  * profiler on the right.
  *
- * <p>The journal lists everything the mod did — macro runs, detections,
- * punishment outcomes, settings changes — newest first, filterable by
+ * <p>The journal lists everything the mod did вЂ” macro runs, detections,
+ * punishment outcomes, settings changes вЂ” newest first, filterable by
  * category. The profiler shows per-section timings and the most recent
  * samples, so a slow chat line or a heavy render path is visible without
  * leaving the game.
@@ -268,6 +268,12 @@ public class AuditScreen extends StScreen {
         );
 
         drawFilterChips(context, alpha);
+
+        // Database filter: split the journal panel вЂ” log left, info right
+        if (filter == AuditCategory.DB) {
+            drawDatabaseSplit(context, alpha);
+            return;
+        }
 
         List<AuditLog.Entry> entries =
                 AuditLog.get().snapshot(filter);
@@ -758,8 +764,103 @@ public class AuditScreen extends StScreen {
         context.disableScissor();
     }
 
-    private static String categoryLabel(AuditCategory category) {
+    /** Full-width profiler panel (Profiler tab). */
+    /** Database filter: log on top, stats below, separated by a divider. */
+    private void drawDatabaseSplit(DrawContext context, float alpha) {
 
+        int x = leftX + PAD;
+        int w = leftW - PAD * 2;
+        int y = listTop();
+
+        // ---- top: DB audit log ----
+        context.drawTextWithShadow(
+                textRenderer,
+                "Журнал базы данных",
+                x, y, Ui.argb(Ui.ACCENT_SOFT, alpha));
+        y += 16;
+
+        java.util.List<AuditLog.Entry> dbEntries =
+                AuditLog.get().snapshot(AuditCategory.DB);
+
+        int logTop = y;
+        int logBottom = y + 60;
+
+        if (dbEntries.isEmpty()) {
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Lang.text(Key.MSG_AUDIT_EMPTY),
+                    x, y, Ui.argb(Ui.TEXT_MUTED, alpha));
+        } else {
+            context.enableScissor(x, logTop, x + w, logBottom);
+            for (AuditLog.Entry e : dbEntries) {
+                if (y > logBottom) break;
+                String line = TIME.format(
+                        Instant.ofEpochMilli(e.at()))
+                        + "  " + e.message();
+                context.drawTextWithShadow(
+                        textRenderer,
+                        Text.literal(textRenderer.trimToWidth(line, w)),
+                        x, y, Ui.argb(Ui.TEXT_DIM, alpha));
+                y += ROW_H;
+            }
+            context.disableScissor();
+        }
+
+        y = Math.max(y, logBottom) + 6;
+
+        // divider
+        context.fill(
+                x, y, x + w, y + 1,
+                Ui.argb(Ui.BORDER, alpha * 0.75f));
+        y += 8;
+
+        // ---- bottom: DB stats ----
+        context.drawTextWithShadow(
+                textRenderer,
+                "Состояние базы данных",
+                x, y, Ui.argb(Ui.ACCENT_SOFT, alpha));
+        y += 16;
+
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db == null) {
+            context.drawTextWithShadow(
+                    textRenderer, "—",
+                    x, y, Ui.argb(Ui.TEXT_MUTED, alpha));
+            return;
+        }
+
+        var stats = db.stats();
+
+        String[][] rows = {
+                {"Размер файла", formatBytes(stats.fileBytes())},
+                {"Ников", String.valueOf(stats.nickCount())},
+                {"Наказаний", String.valueOf(stats.punishmentCount())},
+                {"Записей аудита", String.valueOf(stats.auditCount())},
+        };
+
+        for (String[] row : rows) {
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(row[0]),
+                    x, y, Ui.argb(Ui.TEXT_MUTED, alpha));
+            context.drawTextWithShadow(
+                    textRenderer,
+                    Text.literal(row[1]),
+                    x + w - textRenderer.getWidth(row[1]),
+                    y, Ui.argb(Ui.TEXT, alpha));
+            y += 16;
+        }
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024) + " KB";
+        return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    private static String categoryLabel(AuditCategory category) {
         return switch (category) {
             case MACRO -> Lang.t(Key.AUDIT_CAT_MACRO);
             case DETECT -> Lang.t(Key.AUDIT_CAT_DETECT);
@@ -767,6 +868,7 @@ public class AuditScreen extends StScreen {
             case CONFIG -> Lang.t(Key.AUDIT_CAT_CONFIG);
             case CHAT -> Lang.t(Key.AUDIT_CAT_CHAT);
             case ERROR -> Lang.t(Key.AUDIT_CAT_ERROR);
+            case DB -> Lang.t(Key.AUDIT_CAT_DB);
         };
     }
 }

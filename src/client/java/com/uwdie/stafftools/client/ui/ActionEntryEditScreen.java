@@ -217,6 +217,11 @@ public class ActionEntryEditScreen extends StScreen {
                         MacroExecutor.ALIAS_TOKEN,
                         Lang.t(Key.MSG_ALIAS_HELP)
                 });
+
+                defs.add(new Object[]{
+                        MacroExecutor.REASON_TOKEN,
+                        Lang.t(Key.MSG_REASON_HELP)
+                });
             }
 
             chipW = Math.max(
@@ -229,6 +234,12 @@ public class ActionEntryEditScreen extends StScreen {
                 chipW,
                 textRenderer.getWidth(
                         MacroExecutor.ALIAS_TOKEN
+                ) + 10
+        );
+        chipW = Math.max(
+                chipW,
+                textRenderer.getWidth(
+                        MacroExecutor.REASON_TOKEN
                 ) + 10
         );
         chipW = Math.min(

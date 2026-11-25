@@ -18,6 +18,7 @@ import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -106,6 +107,20 @@ public final class PlayerActionOverlay {
     private int aliasGW;
     private int aliasGH;
 
+    // reason input modal state
+    private boolean reasonOpen;
+    private Macro reasonMacro;
+    private ActionEntry reasonEntry;
+    private PlayerContext reasonTarget;
+    private TextFieldWidget reasonField;
+    private long reasonOpenTime;
+    private int reasonGX;
+    private int reasonGY;
+    private int reasonGW;
+    private int reasonGH;
+    /** Guards against an accidental Enter right after the modal opens. */
+    private long reasonArmedAt;
+
     private boolean manuallyPlaced;
     private boolean dragging;
     private boolean resizing;
@@ -158,6 +173,8 @@ public final class PlayerActionOverlay {
         this.openTime = System.currentTimeMillis();
         this.flashItem = null;
 
+        UiSound.open();
+
         // user size last (default when the "save size" toggle is off)
         StaffToolsConfig config =
                 StafftoolsClient.getConfig();
@@ -195,6 +212,7 @@ public final class PlayerActionOverlay {
 
         if (delayMs <= 0) {
             clearAliasState();
+            UiSound.close();
         }
     }
 
@@ -211,6 +229,7 @@ public final class PlayerActionOverlay {
         this.flashItem = null;
 
         clearAliasState();
+        clearReasonState();
 
         this.items.clear();
         this.rows.clear();
@@ -229,11 +248,100 @@ public final class PlayerActionOverlay {
         }
     }
 
+    private void clearReasonState() {
+
+        reasonOpen = false;
+        reasonMacro = null;
+        reasonEntry = null;
+        reasonTarget = null;
+        reasonField = null;
+        reasonArmedAt = 0L;
+    }
+
+    /** Opens the centered reason-input modal for a macro/action row. */
+    private void openReasonModal(RowItem item) {
+
+        MinecraftClient client = MinecraftClient.getInstance();
+
+        reasonMacro = item.macro;
+        reasonEntry = item.entry;
+        reasonTarget = player;
+
+        int fieldW = 220;
+        int fieldH = 20;
+
+        reasonField = new TextFieldWidget(
+                client.textRenderer,
+                0, 0, fieldW, fieldH,
+                Lang.text(Key.REASON_PLACEHOLDER)
+        );
+
+        reasonField.setMaxLength(Integer.MAX_VALUE);
+        reasonField.setDrawsBackground(false);
+        reasonField.setEditableColor(0xFFFFFFFF);
+        reasonField.setUneditableColor(0xFFAAAAAA);
+
+        reasonOpenTime = System.currentTimeMillis();
+        // Enter only arms after a short delay, so a stray keypress that
+        // opened the modal cannot instantly confirm an empty reason.
+        reasonArmedAt = reasonOpenTime + 350L;
+        reasonOpen = true;
+
+        reasonField.setFocused(true);
+
+        UiSound.open();
+    }
+
+    /** Validates and runs the command with the typed reason substituted. */
+    private void confirmReason() {
+
+        String reason = reasonField == null
+                ? ""
+                : reasonField.getText();
+
+        Macro macro = reasonMacro;
+        ActionEntry entry = reasonEntry;
+        PlayerContext target = reasonTarget;
+
+        clearReasonState();
+
+        if (macro != null) {
+
+            MacroExecutor.executeWithReason(macro, target, reason);
+
+            Toasts.INSTANCE.success(
+                    Lang.t(Key.TOAST_EXECUTED, macro.getName())
+            );
+
+        } else if (entry != null) {
+
+            MacroExecutor.executeActionWithReason(
+                    entry.getCommand(),
+                    target,
+                    reason,
+                    entry.getLabel()
+            );
+
+            Toasts.INSTANCE.success(
+                    Lang.t(Key.TOAST_EXECUTED, entry.getLabel())
+            );
+        }
+
+        UiSound.confirm();
+
+        requestClose(0);
+    }
+
     /**
      * ESC handling: closes the alias modal first, then the popup.
      * Returns true if something was closed.
      */
     public boolean handleEscape() {
+
+        if (reasonOpen) {
+            clearReasonState();
+            return true;
+        }
 
         if (aliasOpen) {
             clearAliasState();
@@ -246,6 +354,55 @@ public final class PlayerActionOverlay {
         }
 
         return false;
+    }
+
+    /**
+     * Keyboard input for the reason modal. Returns true when the key was
+     * consumed. Enter confirms only after the arming delay, so a stray
+     * keypress that opened the modal cannot submit an empty reason.
+     *
+     * <p>Since 1.21.11 there is no {@code charTyped}: printable input
+     * arrives here as a key event with keycode 0, so it is forwarded to
+     * the field as a character.
+     */
+    public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+
+        if (!reasonOpen || reasonField == null) {
+            return false;
+        }
+
+        int keyCode = input.key();
+
+        if (keyCode == GLFW.GLFW_KEY_ENTER ||
+                keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+
+            if (System.currentTimeMillis() >= reasonArmedAt) {
+                confirmReason();
+            }
+
+            return true;
+        }
+
+        boolean handled = reasonField.keyPressed(input);
+
+        // printable character typed (keycode 0 carries the char)
+        if (keyCode == 0) {
+            handled |= reasonField.charTyped(
+                    new net.minecraft.client.input.CharInput(
+                            input.scancode(), input.modifiers()));
+        }
+
+        return handled;
+    }
+
+    /** Character input routed from the screen while the modal is open. */
+    public boolean charTyped(net.minecraft.client.input.CharInput input) {
+
+        if (!reasonOpen || reasonField == null) {
+            return false;
+        }
+
+        return reasonField.charTyped(input);
     }
 
     private void buildItems() {
@@ -521,6 +678,18 @@ public final class PlayerActionOverlay {
                     context,
                     mouseX,
                     mouseY
+            );
+
+            return;
+        }
+
+        if (reasonOpen) {
+
+            drawReasonModal(
+                    context,
+                    mouseX,
+                    mouseY,
+                    delta
             );
 
             return;
@@ -1095,6 +1264,126 @@ public final class PlayerActionOverlay {
         }
     }
 
+    /** Centered modal with a single text field for the typed reason. */
+    private void drawReasonModal(
+            DrawContext context,
+            int mouseX,
+            int mouseY,
+            float delta
+    ) {
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        TextRenderer tr = client.textRenderer;
+
+        int screenWidth = client.getWindow().getScaledWidth();
+        int screenHeight = client.getWindow().getScaledHeight();
+
+        float slide = Ui.entranceProgress(reasonOpenTime, 0L, 220L);
+        float modalAlpha =
+                Ui.entranceProgress(reasonOpenTime, 0L, 160L);
+
+        if (modalAlpha <= 0.01f) {
+            return;
+        }
+
+        reasonGW = 248;
+        reasonGH = 108;
+
+        int offsetX = (int) ((1f - slide) * -28);
+
+        reasonGX = (screenWidth - reasonGW) / 2 + offsetX;
+        reasonGY = (screenHeight - reasonGH) / 2;
+
+        Ui.drawPopupFrame(
+                context,
+                reasonGX,
+                reasonGY,
+                reasonGW,
+                reasonGH,
+                modalAlpha
+        );
+
+        context.drawCenteredTextWithShadow(
+                tr,
+                Lang.text(Key.REASON_TITLE),
+                reasonGX + reasonGW / 2,
+                reasonGY + 12,
+                Ui.argb(Ui.TEXT, modalAlpha)
+        );
+
+        int fieldX = reasonGX + PAD;
+        int fieldY = reasonGY + 42;
+        int fieldW = reasonGW - PAD * 2;
+        int fieldH = 22;
+
+        // visible bordered box so it is obvious where to type
+        boolean fieldFocused =
+                reasonField != null && reasonField.isFocused();
+
+        Ui.drawRoundRect(
+                context,
+                fieldX, fieldY, fieldW, fieldH,
+                4,
+                Ui.argb(Ui.SURFACE_2, modalAlpha));
+
+        Ui.drawRoundBorder(
+                context,
+                fieldX, fieldY, fieldW, fieldH,
+                4,
+                Ui.argb(
+                        fieldFocused ? Ui.ACCENT : Ui.BORDER,
+                        modalAlpha));
+
+        if (fieldFocused) {
+            Ui.drawHoverGlow(
+                    context,
+                    fieldX, fieldY, fieldW, fieldH,
+                    4, Ui.ACCENT, 0.6f, modalAlpha * 0.6f);
+        }
+
+        if (reasonField != null) {
+
+            reasonField.setX(fieldX);
+            reasonField.setY(fieldY + 4);
+            reasonField.setWidth(fieldW);
+
+            reasonField.render(context, mouseX, mouseY, delta);
+        }
+
+        // confirm button
+        int btnW = 96;
+        int btnH = 18;
+        int btnX = reasonGX + (reasonGW - btnW) / 2;
+        int btnY = reasonGY + reasonGH - btnH - 10;
+
+        boolean hovered =
+                mouseX >= btnX && mouseX <= btnX + btnW &&
+                        mouseY >= btnY && mouseY <= btnY + btnH;
+
+        Ui.drawRoundRect(
+                context,
+                btnX, btnY, btnW, btnH,
+                4,
+                Ui.argb(
+                        hovered ? Ui.ACCENT : Ui.ACCENT_DARK,
+                        modalAlpha
+                )
+        );
+
+        String label = tr.trimToWidth(
+                Lang.t(Key.REASON_CONFIRM),
+                btnW - 10
+        );
+
+        context.drawCenteredTextWithShadow(
+                tr,
+                Text.literal(label),
+                btnX + btnW / 2,
+                btnY + (btnH - 9) / 2,
+                Ui.argb(0xFFFFFFFF, modalAlpha)
+        );
+    }
+
     /**
      * The two quick buttons under the header: "Copy name" (left) and
      * "Duplicate to chat" (right), split in two equal halves.
@@ -1537,6 +1826,38 @@ public final class PlayerActionOverlay {
         }
 
         // alias modal swallows all clicks
+        if (reasonOpen) {
+
+            // confirm button
+            int btnW = 96;
+            int btnH = 18;
+            int btnX = reasonGX + (reasonGW - btnW) / 2;
+            int btnY = reasonGY + reasonGH - btnH - 10;
+
+            boolean onButton =
+                    mouseX >= btnX && mouseX <= btnX + btnW &&
+                            mouseY >= btnY && mouseY <= btnY + btnH;
+
+            if (onButton) {
+                confirmReason();
+                return true;
+            }
+
+            // clicking the field focuses it; anything else keeps the
+            // modal open (no accidental dismissal)
+            if (reasonField != null) {
+                reasonField.mouseClicked(
+                        new net.minecraft.client.gui.Click(
+                                mouseX, mouseY,
+                                new net.minecraft.client.input.MouseInput(0, 0)
+                        ),
+                        false
+                );
+            }
+
+            return true;
+        }
+
         if (aliasOpen) {
 
             boolean inside =
@@ -1807,6 +2128,8 @@ public final class PlayerActionOverlay {
                 Lang.t(Key.TOAST_COPIED, player.name())
         );
 
+        UiSound.copy();
+
         requestClose(0);
     }
 
@@ -1916,6 +2239,15 @@ public final class PlayerActionOverlay {
                 item.macro != null
                         ? item.macro.getAliases()
                         : item.aliases();
+
+        // <reason> is resolved first: the user types it in a modal,
+        // then the flow continues (alias / direct execution) with the
+        // reason already substituted.
+        if (MacroExecutor.requiresReason(commands)) {
+
+            openReasonModal(item);
+            return true;
+        }
 
         boolean needsAlias =
                 MacroExecutor.requiresAlias(commands);

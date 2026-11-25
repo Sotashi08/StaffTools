@@ -5,6 +5,7 @@ import com.uwdie.stafftools.client.i18n.Lang;
 import com.uwdie.stafftools.client.i18n.Lang.Key;
 import com.uwdie.stafftools.client.macro.CommandPreview;
 import com.uwdie.stafftools.client.macro.Macro;
+import com.uwdie.stafftools.client.macro.MacroExecutor;
 import com.uwdie.stafftools.client.macro.Placeholder;
 import com.uwdie.stafftools.client.macro.PlaceholderRegistry;
 import com.uwdie.stafftools.client.ui.widget.StButton;
@@ -234,6 +235,11 @@ public class MacroEditorScreen extends StScreen {
                         "<alias>",
                         Lang.t(Key.MSG_ALIAS_HELP)
                 });
+
+                defs.add(new Object[]{
+                        MacroExecutor.REASON_TOKEN,
+                        Lang.t(Key.MSG_REASON_HELP)
+                });
             }
 
             chipW = Math.max(
@@ -245,6 +251,12 @@ public class MacroEditorScreen extends StScreen {
         chipW = Math.max(
                 chipW,
                 textRenderer.getWidth("<alias>") + 10
+        );
+        chipW = Math.max(
+                chipW,
+                textRenderer.getWidth(
+                        MacroExecutor.REASON_TOKEN
+                ) + 10
         );
         chipW = Math.min(
                 chipW,

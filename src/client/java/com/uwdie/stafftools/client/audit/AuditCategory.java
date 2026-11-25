@@ -22,7 +22,10 @@ public enum AuditCategory {
     CHAT("chat", 0xFF8FE8DB),
 
     /** Internal errors and rejected operations. */
-    ERROR("error", 0xFFFF5555);
+    ERROR("error", 0xFFFF5555),
+
+    /** Database lifecycle: init, migration, inserts. */
+    DB("db", 0xFF5EC8F0);
 
     private final String id;
     private final int color;

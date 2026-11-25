@@ -78,6 +78,57 @@ public final class PunishmentHistory {
     public static void init(Path path) {
         instance = new PunishmentHistory(path);
         instance.load();
+        instance.migrateToDb();
+    }
+
+    /**
+     * Imports the existing JSON history into the database on first run,
+     * so nothing is lost when switching to SQLite. Runs once: it only
+     * acts when the punishments table is empty.
+     */
+    private void migrateToDb() {
+
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db == null || records.isEmpty()) {
+            return;
+        }
+
+        try (var st = db.conn().createStatement();
+                var rs = st.executeQuery(
+                        "SELECT COUNT(*) FROM punishments")) {
+
+            if (rs.next() && rs.getInt(1) > 0) {
+                return; // already migrated
+            }
+
+        } catch (Exception ignored) {
+            return;
+        }
+
+        for (PunishmentRecord r : records) {
+
+            int id = db.insertPunishment(
+                    r.getPlayerName(),
+                    r.getType().name(),
+                    r.getFullCommand(),
+                    r.getModerator(),
+                    r.getStatus().name(),
+                    r.getServerKey(),
+                    r.getSourceName(),
+                    r.getSourceKind() == null
+                            ? null
+                            : r.getSourceKind().name(),
+                    r.getResponse());
+
+            r.setDbId(id);
+        }
+
+        AuditLog.get().info(
+                AuditCategory.CONFIG,
+                "Migrated " + records.size()
+                        + " punishments to database");
     }
 
     public static PunishmentHistory get() {
@@ -132,6 +183,26 @@ public final class PunishmentHistory {
             records.add(0, record);
             trim();
             save();
+
+            // persist to DB (id kept for later status updates)
+            com.uwdie.stafftools.client.db.Database db =
+                    com.uwdie.stafftools.client.db.Database.get();
+
+            if (db != null) {
+                int id = db.insertPunishment(
+                        record.getPlayerName(),
+                        record.getType().name(),
+                        record.getFullCommand(),
+                        record.getModerator(),
+                        record.getStatus().name(),
+                        record.getServerKey(),
+                        record.getSourceName(),
+                        record.getSourceKind() == null
+                                ? null
+                                : record.getSourceKind().name(),
+                        record.getResponse());
+                record.setDbId(id);
+            }
 
             AuditLog.get().info(
                     AuditCategory.PUNISH,
@@ -374,6 +445,17 @@ public final class PunishmentHistory {
 
         best.setStatus(outcome);
         best.setResponse(message);
+
+        // persist status change to DB
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db != null && best.getDbId() > 0) {
+            db.updatePunishmentStatus(
+                    best.getDbId(),
+                    outcome.name(),
+                    message);
+        }
 
         save();
 

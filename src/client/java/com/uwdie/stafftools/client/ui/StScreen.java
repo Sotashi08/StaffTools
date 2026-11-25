@@ -101,22 +101,35 @@ public abstract class StScreen extends Screen {
         shell.rail(
                 new StShell.RailItem(
                         "\u26A1", "btn.macros", "hint.rail.macros",
-                        () -> client.setScreen(new MacroListScreen(this))),
+                        () -> client.setScreen(new MacroListScreen(this)),
+                        "macros"),
                 new StShell.RailItem(
                         "\uD83D\uDCCB", "btn.playerActions", "hint.rail.actions",
-                        () -> client.setScreen(new ActionsConfigScreen(this))),
+                        () -> client.setScreen(new ActionsConfigScreen(this)),
+                        "actions"),
                 new StShell.RailItem(
                         "\uD83D\uDD52", "btn.history", "hint.rail.history",
-                        () -> client.setScreen(new ActionHistoryScreen(this))),
+                        () -> client.setScreen(new ActionHistoryScreen(this)),
+                        "history"),
                 new StShell.RailItem(
                         "\uD83D\uDC64", "btn.profiles", "hint.rail.profiles",
-                        () -> client.setScreen(new ProfilesScreen(this))),
+                        () -> client.setScreen(new ProfilesScreen(this)),
+                        "profiles"),
                 new StShell.RailItem(
                         "\uD83D\uDD0E", "btn.audit", "hint.rail.audit",
-                        () -> client.setScreen(new AuditScreen(this))),
+                        () -> client.setScreen(new AuditScreen(this)),
+                        "audit"),
                 new StShell.RailItem(
                         "\u2699", "btn.settings", "hint.rail.settings",
-                        () -> client.setScreen(new SettingsScreen(this)))
+                        () -> client.setScreen(new SettingsScreen(this)),
+                        "settings")
+        );
+
+        shell.bottomRail(
+                new StShell.RailItem(
+                        "\uD83D\uDCD6", "btn.guidebook", "hint.rail.guidebook",
+                        () -> client.setScreen(new GuidebookScreen(this)),
+                        "guidebook")
         );
     }
 

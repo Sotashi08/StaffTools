@@ -76,6 +76,12 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
+    // Embedded SQLite (bundled via jar-in-jar) for persistent storage
+    implementation("org.xerial:sqlite-jdbc:3.46.1.3") {
+        // native drivers are bundled by sqlite-jdbc itself
+    }
+    include("org.xerial:sqlite-jdbc:3.46.1.3")
+
     // Test dependencies (disabled due to Gradle worker issues)
     // testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
     // testImplementation "org.mockito:mockito-core:5.11.0"

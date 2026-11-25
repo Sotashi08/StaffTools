@@ -24,8 +24,8 @@ import net.minecraft.text.Text;
  */
 public final class NickStats {
 
-    private static final int CARD_WIDTH = 208;
-    private static final int CARD_HEIGHT = 112;
+    private static final int CARD_WIDTH = 224;
+    private static final int CARD_HEIGHT = 124;
 
     private static final String[] ADDRESS_PHRASES_RU = {
             "{name}, я всё вижу",
@@ -252,48 +252,84 @@ public final class NickStats {
         TextRenderer tr =
                 MinecraftClient.getInstance().textRenderer;
 
+        PlayerListEntry entry = entryOf(player);
+        boolean online = entry != null;
+        int statusColor = online ? Ui.SUCCESS : Ui.TEXT_MUTED;
+
+        // accent ribbon across the top
+        int ribbon = Ui.mix(Ui.ACCENT, Ui.ACCENT_2, 0.5f);
+        Ui.drawRoundRect(
+                context,
+                x + 6, y + 4, CARD_WIDTH - 12, 3,
+                2, Ui.argb(ribbon, alpha));
+
+        // gradient header background (accent tint fading down)
+        context.fillGradient(
+                x + 6, y + 6,
+                x + CARD_WIDTH - 6, y + 40,
+                Ui.argb(Ui.mix(Ui.PANEL_BG, Ui.ACCENT, 0.18f), alpha),
+                Ui.argb(Ui.PANEL_BG, 0f));
+
+        // soft accent glow behind the header
+        Ui.drawHoverGlow(
+                context,
+                x + 6, y + 6, CARD_WIDTH - 12, 22,
+                4, Ui.ACCENT, 0.5f, alpha * 0.5f);
+
+        // left accent stripe next to the name
+        Ui.drawRoundRect(
+                context,
+                x + 8, y + 12, 3, 12,
+                2, Ui.argb(ribbon, alpha));
+
+        // player name
         String name =
                 fitText(
                         tr,
                         player.name(),
-                        CARD_WIDTH - 24
+                        CARD_WIDTH - 30
                 );
 
         context.drawTextWithShadow(
                 tr,
                 Text.literal(name),
-                x + 12,
-                y + 10,
+                x + 15,
+                y + 12,
                 Ui.argb(Ui.TEXT, alpha)
         );
 
-        PlayerListEntry entry = entryOf(player);
-        int statusColor =
-                entry == null
-                        ? Ui.TEXT_MUTED
-                        : Ui.SUCCESS;
+        // animated status dot (pulses while online)
+        float pulse = online && Ui.animationsEnabled()
+                ? 0.5f + 0.5f * (float) Math.sin(
+                        (System.currentTimeMillis() % 1200L)
+                                / 1200.0 * Math.PI * 2)
+                : 1f;
 
-        context.fill(
-                x + 12,
-                y + 24,
-                x + 14,
-                y + 26,
-                Ui.argb(statusColor, alpha)
-        );
+        int dotX = x + 14;
+        int dotY = y + 30;
+        Ui.drawRoundRect(
+                context,
+                dotX - 1, dotY - 1, 6, 6,
+                3, Ui.argb(statusColor, alpha * 0.35f * pulse));
+        Ui.drawRoundRect(
+                context,
+                dotX, dotY, 4, 4,
+                2, Ui.argb(statusColor, alpha));
 
         context.drawTextWithShadow(
                 tr,
                 Text.literal(
-                        entry == null
-                                ? Lang.t(Key.HOVER_STATS_OFFLINE)
-                                : Lang.t(Key.HOVER_STATS_ONLINE)
+                        online
+                                ? Lang.t(Key.HOVER_STATS_ONLINE)
+                                : Lang.t(Key.HOVER_STATS_OFFLINE)
                 ),
-                x + 17,
-                y + 21,
+                x + 21,
+                y + 27,
                 Ui.argb(statusColor, alpha)
         );
 
-        int separatorY = y + 39;
+        // divider
+        int separatorY = y + 42;
         context.fill(
                 x + 10,
                 separatorY,
@@ -303,9 +339,9 @@ public final class NickStats {
         );
 
         int col1 = x + 12;
-        int col2 = x + CARD_WIDTH / 2 + 4;
-        int row1 = y + 48;
-        int row2 = y + 66;
+        int col2 = x + CARD_WIDTH / 2 + 6;
+        int row1 = y + 52;
+        int row2 = y + 74;
 
         drawStat(
                 context,
@@ -313,10 +349,10 @@ public final class NickStats {
                 col1,
                 row1,
                 Lang.t(Key.HOVER_STATS_PING),
-                entry == null ? "—" : entry.getLatency() + " ms",
-                entry == null
-                        ? Ui.TEXT_MUTED
-                        : pingUiColor(entry.getLatency()),
+                online ? entry.getLatency() + " ms" : "—",
+                online
+                        ? pingUiColor(entry.getLatency())
+                        : Ui.TEXT_MUTED,
                 alpha
         );
 
@@ -326,12 +362,14 @@ public final class NickStats {
                 col2,
                 row1,
                 Lang.t(Key.HOVER_STATS_GAMEMODE),
-                entry == null || entry.getGameMode() == null
-                        ? "—"
-                        : entry.getGameMode().getId(),
+                online && entry.getGameMode() != null
+                        ? entry.getGameMode().getId()
+                        : "—",
                 Ui.ACCENT_SOFT,
                 alpha
         );
+
+        int punish = punishmentCount(player);
 
         drawStat(
                 context,
@@ -339,10 +377,8 @@ public final class NickStats {
                 col1,
                 row2,
                 Lang.t(Key.HOVER_STATS_PUNISH),
-                String.valueOf(punishmentCount(player)),
-                punishmentCount(player) == 0
-                        ? Ui.TEXT_MUTED
-                        : Ui.WARNING,
+                String.valueOf(punish),
+                punish == 0 ? Ui.TEXT_MUTED : Ui.WARNING,
                 alpha
         );
 
@@ -360,38 +396,38 @@ public final class NickStats {
                 alpha
         );
 
-        int footerY = y + CARD_HEIGHT - 18;
+        // footer with accent side bar + rotating phrase
+        int footerY = y + CARD_HEIGHT - 20;
 
         context.fill(
                 x + 10,
-                footerY - 5,
+                footerY - 6,
                 x + CARD_WIDTH - 10,
-                footerY - 4,
+                footerY - 5,
                 Ui.argb(Ui.BORDER, alpha * 0.55f)
         );
 
+        Ui.drawRoundRect(
+                context,
+                x + 10, footerY - 1, 3, 11,
+                2, Ui.argb(Ui.ACCENT, alpha));
+
         String phrase =
                 addressedPhrase(player.name());
-
-        int phraseMaxWidth =
-                CARD_WIDTH - 24;
 
         String fittedPhrase =
                 fitText(
                         tr,
                         phrase,
-                        phraseMaxWidth
+                        CARD_WIDTH - 30
                 );
-
-        int phraseWidth =
-                tr.getWidth(fittedPhrase);
 
         context.drawTextWithShadow(
                 tr,
                 Text.literal(fittedPhrase),
-                x + (CARD_WIDTH - phraseWidth) / 2,
+                x + 18,
                 footerY,
-                Ui.argb(Ui.TEXT_MUTED, alpha)
+                Ui.argb(Ui.TEXT_DIM, alpha)
         );
     }
 

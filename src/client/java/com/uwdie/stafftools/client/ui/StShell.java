@@ -3,8 +3,10 @@ package com.uwdie.stafftools.client.ui;
 import com.uwdie.stafftools.client.i18n.Lang;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +54,19 @@ public final class StShell {
             String glyph,
             String labelKey,
             String hintKey,
-            Runnable action
+            Runnable action,
+            String icon
     ) {
+
+        /** Glyph-only entry (no custom icon texture). */
+        public RailItem(
+                String glyph,
+                String labelKey,
+                String hintKey,
+                Runnable action
+        ) {
+            this(glyph, labelKey, hintKey, action, null);
+        }
     }
 
     /** One tab of the tab row. */
@@ -61,6 +74,9 @@ public final class StShell {
     }
 
     private final List<RailItem> rail = new ArrayList<>();
+
+    /** Rail items pinned to the very bottom of the rail. */
+    private final List<RailItem> bottomRail = new ArrayList<>();
     private final List<Tab> tabs = new ArrayList<>();
 
     private int activeRail = -1;
@@ -68,6 +84,14 @@ public final class StShell {
 
     /** Screen-space bounds of the rail items, for hit testing. */
     private final List<int[]> railBoxes = new ArrayList<>();
+
+    /**
+     * For each entry in {@link #railBoxes}: index into {@link #rail} or,
+     * when negative, {@code -1 - index} into {@link #bottomRail}.
+     */
+    private final List<Integer> railBottomIndex = new ArrayList<>();
+
+    private float[] bottomHoverAmounts = new float[0];
 
     /** Screen-space bounds of the tabs, for hit testing. */
     private final List<int[]> tabBoxes = new ArrayList<>();
@@ -128,6 +152,20 @@ public final class StShell {
 
     public StShell activeRail(int index) {
         this.activeRail = index;
+        return this;
+    }
+
+    /** Sets the rail items pinned to the bottom of the rail. */
+    public StShell bottomRail(RailItem... items) {
+
+        bottomRail.clear();
+
+        for (RailItem item : items) {
+            bottomRail.add(item);
+        }
+
+        bottomHoverAmounts = new float[bottomRail.size()];
+
         return this;
     }
 
@@ -242,6 +280,7 @@ public final class StShell {
         layout();
 
         railBoxes.clear();
+        railBottomIndex.clear();
         tabBoxes.clear();
         topBoxes.clear();
         topActions.clear();
@@ -353,6 +392,52 @@ public final class StShell {
     // left rail
     // ------------------------------------------------------------------
 
+    /**
+     * Draws a rail entry's icon: a custom texture when {@code icon} is
+     * set, otherwise the emoji glyph. The texture is white and tinted
+     * with the given color so it matches the theme.
+     */
+    private void drawRailGlyph(
+            DrawContext context,
+            TextRenderer tr,
+            RailItem item,
+            int x,
+            int y,
+            int itemSize,
+            int color,
+            float alpha
+    ) {
+
+        if (item.icon() != null) {
+
+            int iconSize = 20;
+            int ix = x + (itemSize - iconSize) / 2;
+            int iy = y + (itemSize - iconSize) / 2;
+
+            context.drawTexture(
+                    RenderPipelines.GUI_TEXTURED,
+                    Identifier.of(
+                            "stafftools",
+                            "textures/icons/" + item.icon() + ".png"),
+                    ix, iy,
+                    0f, 0f,
+                    iconSize, iconSize,
+                    iconSize, iconSize,
+                    Ui.argb(color, alpha)
+            );
+
+            return;
+        }
+
+        context.drawCenteredTextWithShadow(
+                tr,
+                Text.literal(item.glyph()),
+                x + itemSize / 2,
+                y + (itemSize - 9) / 2,
+                Ui.argb(color, alpha)
+        );
+    }
+
     private void drawRail(
             DrawContext context,
             TextRenderer tr,
@@ -443,20 +528,16 @@ public final class StShell {
                 );
             }
 
-            context.drawCenteredTextWithShadow(
-                    tr,
-                    Text.literal(item.glyph()),
-                    x + itemSize / 2,
-                    y + (itemSize - 9) / 2,
-                    Ui.argb(
-                            active
-                                    ? Ui.ACCENT
-                                    : Ui.mix(Ui.TEXT_MUTED, Ui.TEXT, hover),
-                            alpha
-                    )
+            drawRailGlyph(
+                    context, tr, item,
+                    x, y, itemSize,
+                    active ? Ui.ACCENT
+                            : Ui.mix(Ui.TEXT_MUTED, Ui.TEXT, hover),
+                    alpha
             );
 
             railBoxes.add(new int[]{x, y, itemSize, itemSize});
+            railBottomIndex.add(i);
 
             if (hovered) {
                 tipText = Lang.t(item.hintKey());
@@ -465,6 +546,76 @@ public final class StShell {
             }
 
             y += itemSize + gap;
+        }
+
+        // bottom-pinned items (e.g. guidebook), stacked upward
+        if (!bottomRail.isEmpty()) {
+
+            int by = winY + winH - 10 - itemSize;
+
+            for (int i = bottomRail.size() - 1; i >= 0; i--) {
+
+                RailItem item = bottomRail.get(i);
+
+                int x = railX + (RAIL_W - itemSize) / 2;
+
+                boolean hovered =
+                        mouseX >= x && mouseX <= x + itemSize &&
+                                mouseY >= by && mouseY <= by + itemSize;
+
+                float hover = animateHover(
+                        bottomHoverAmounts[i],
+                        hovered,
+                        delta
+                );
+                bottomHoverAmounts[i] = hover;
+
+                if (hover > 0.01f) {
+
+                    Ui.drawShadow(
+                            context, x, by, itemSize, itemSize,
+                            Design.RADIUS_LG, 2, 0.10f * hover, alpha
+                    );
+                    Ui.drawHoverGlow(
+                            context, x, by, itemSize, itemSize,
+                            Design.RADIUS_LG, Ui.ACCENT, hover, alpha
+                    );
+                    Ui.drawRoundRect(
+                            context, x, by, itemSize, itemSize,
+                            Design.RADIUS_LG,
+                            Ui.argb(
+                                    Ui.mix(Ui.SURFACE, Ui.SURFACE_2, hover),
+                                    alpha
+                            )
+                    );
+                    Ui.drawRoundBorder(
+                            context, x, by, itemSize, itemSize,
+                            Design.RADIUS_LG,
+                            Ui.argb(
+                                    Ui.mix(Ui.BORDER, Ui.ACCENT, hover * 0.4f),
+                                    alpha
+                            )
+                    );
+                }
+
+                drawRailGlyph(
+                        context, tr, item,
+                        x, by, itemSize,
+                        Ui.mix(Ui.TEXT_MUTED, Ui.TEXT, hover),
+                        alpha
+                );
+
+                railBoxes.add(new int[]{x, by, itemSize, itemSize});
+                railBottomIndex.add(-1 - i);
+
+                if (hovered) {
+                    tipText = Lang.t(item.hintKey());
+                    tipX = x + itemSize + 8;
+                    tipY = by + 8;
+                }
+
+                by -= itemSize + gap;
+            }
         }
     }
 
@@ -1214,7 +1365,11 @@ public final class StShell {
 
             if (hit(railBoxes.get(i), mouseX, mouseY)) {
 
-                RailItem item = rail.get(i);
+                int marker = railBottomIndex.get(i);
+
+                RailItem item = marker < 0
+                        ? bottomRail.get(-1 - marker)
+                        : rail.get(marker);
 
                 if (item.action() != null) {
                     item.action().run();

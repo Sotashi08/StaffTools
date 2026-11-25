@@ -7,6 +7,7 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.screen.ChatScreen;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.input.CharInput;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -134,6 +135,30 @@ public interface ParentElementMixin {
                         click.button()
                 )) {
 
+            cir.setReturnValue(true);
+        }
+    }
+
+    /**
+     * While the reason modal is open, typed characters must go to its
+     * text field instead of the chat input. {@code charTyped} is a
+     * default method here, so this catches every screen.
+     */
+    @Inject(
+            method = "charTyped",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    default void stafftools$onCharTyped(
+            CharInput input,
+            CallbackInfoReturnable<Boolean> cir
+    ) {
+
+        if (!((Object) this instanceof ChatScreen)) {
+            return;
+        }
+
+        if (PlayerActionOverlay.INSTANCE.charTyped(input)) {
             cir.setReturnValue(true);
         }
     }

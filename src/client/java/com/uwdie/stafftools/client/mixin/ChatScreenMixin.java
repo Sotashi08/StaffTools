@@ -390,6 +390,12 @@ public class ChatScreenMixin {
             CallbackInfoReturnable<Boolean> cir
     ) {
 
+        // the reason modal consumes typing first
+        if (PlayerActionOverlay.INSTANCE.keyPressed(input)) {
+            cir.setReturnValue(true);
+            return;
+        }
+
         if (PlayerActionOverlay.INSTANCE.isOpen() &&
                 input.key() == GLFW.GLFW_KEY_ESCAPE) {
 

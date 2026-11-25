@@ -17,6 +17,9 @@ public final class MacroExecutor {
     /** Placeholder that turns a command into an alias picker flow. */
     public static final String ALIAS_TOKEN = "<alias>";
 
+    /** Placeholder replaced by a reason the user types in a modal. */
+    public static final String REASON_TOKEN = "<reason>";
+
     private MacroExecutor() {
     }
 
@@ -131,6 +134,115 @@ public final class MacroExecutor {
                 SourceKind.ACTION,
                 null
         );
+    }
+
+    /**
+     * True if any command contains the {@code <reason>} placeholder and
+     * therefore needs a typed reason before execution.
+     */
+    public static boolean requiresReason(Macro macro) {
+
+        return macro != null && requiresReason(macro.getCommands());
+    }
+
+    /** Same check for a bare command list (player actions). */
+    public static boolean requiresReason(List<String> commands) {
+
+        if (commands == null) {
+            return false;
+        }
+
+        for (String command : commands) {
+
+            if (command != null &&
+                    command.contains(REASON_TOKEN)) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Executes a macro with {@code <reason>} replaced by the typed reason
+     * BEFORE regular placeholder resolution. An empty reason is allowed;
+     * leftover double spaces are collapsed.
+     */
+    public static void executeWithReason(
+            Macro macro,
+            PlayerContext target,
+            String reason
+    ) {
+
+        if (macro == null) {
+            return;
+        }
+
+        if (!macro.isEnabled()) {
+
+            AuditLog.get().warn(
+                    AuditCategory.MACRO,
+                    "Macro skipped (disabled): " + macro.getName()
+            );
+
+            return;
+        }
+
+        executeCommands(
+                substituteReason(macro.getCommands(), reason),
+                target,
+                macro.getName(),
+                SourceKind.MACRO,
+                null
+        );
+    }
+
+    /** Runs a player action whose command carries {@code <reason>}. */
+    public static void executeActionWithReason(
+            String command,
+            PlayerContext target,
+            String reason,
+            String actionLabel
+    ) {
+
+        executeCommands(
+                substituteReason(
+                        List.of(command == null ? "" : command),
+                        reason
+                ),
+                target,
+                actionLabel,
+                SourceKind.ACTION,
+                null
+        );
+    }
+
+    /** Replaces {@code <reason>} in every command and tidies spaces. */
+    public static List<String> substituteReason(
+            List<String> commands,
+            String reason
+    ) {
+
+        String safeReason = reason == null ? "" : reason.trim();
+
+        List<String> out = new ArrayList<>();
+
+        for (String command : commands) {
+
+            if (command == null) {
+                continue;
+            }
+
+            out.add(
+                    command
+                            .replace(REASON_TOKEN, safeReason)
+                            .replaceAll(" {2,}", " ")
+                            .trim()
+            );
+        }
+
+        return out;
     }
 
     /** Runs a player action whose command carries {@code <alias>}. */

@@ -29,6 +29,9 @@ public class PunishmentRecord {
     /** Name of the macro or action the punishment came from. */
     private String sourceName;
 
+    /** Row id in the SQLite database, or -1 when not persisted. */
+    private int dbId = -1;
+
     /** Where a punishment came from. */
     public enum SourceKind {
 
@@ -170,6 +173,14 @@ public class PunishmentRecord {
 
     public void setSourceName(String sourceName) {
         this.sourceName = sourceName;
+    }
+
+    public int getDbId() {
+        return dbId;
+    }
+
+    public void setDbId(int dbId) {
+        this.dbId = dbId;
     }
 
     /** Name of the macro, kept for records written by older builds. */

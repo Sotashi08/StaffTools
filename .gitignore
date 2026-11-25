@@ -4,3 +4,8 @@
 /run/
 /build/classes/java/client/
 /build/classes/java/main/
+/gradle/wrapper/dists/
+/gradle/
+/.idea/
+/.vscode/
+/bin

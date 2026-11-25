@@ -83,6 +83,71 @@ public final class AuditLog {
 
             totalRecorded++;
         }
+
+        // persist to DB (permanent record; in-memory buffer stays for UI)
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db != null) {
+            db.insertAudit(
+                    category.name(),
+                    level.name(),
+                    message == null ? "" : message);
+        }
+
+        // queue for batched DB write (flushed every few seconds)
+        queueForDb(category, level, message == null ? "" : message);
+    }
+
+    /** Pending audit rows waiting to be flushed to the DB. */
+    private static final java.util.List<String[]> pendingDb =
+            new java.util.ArrayList<>();
+
+    private static long lastFlushAt;
+
+    private static final long FLUSH_INTERVAL_MS = 5000L;
+
+    private static void queueForDb(
+            AuditCategory category,
+            AuditLevel level,
+            String message
+    ) {
+        synchronized (pendingDb) {
+            pendingDb.add(new String[]{
+                    category.name(), level.name(), message});
+        }
+    }
+
+    /** Writes queued audit rows to the DB. Call from the tick/render. */
+    public static void flushDb() {
+
+        long now = System.currentTimeMillis();
+
+        if (now - lastFlushAt < FLUSH_INTERVAL_MS) {
+            return;
+        }
+
+        lastFlushAt = now;
+
+        com.uwdie.stafftools.client.db.Database db =
+                com.uwdie.stafftools.client.db.Database.get();
+
+        if (db == null) {
+            return;
+        }
+
+        synchronized (pendingDb) {
+
+            if (pendingDb.isEmpty()) {
+                return;
+            }
+
+            for (String[] row : pendingDb) {
+                db.insertAudit(row[0], row[1], row[2]);
+            }
+
+            pendingDb.clear();
+        }
     }
 
     public void info(AuditCategory category, String message) {

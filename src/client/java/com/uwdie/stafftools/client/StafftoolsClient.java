@@ -31,6 +31,14 @@ public class StafftoolsClient implements ClientModInitializer {
         configManager = new ConfigManager();
         configManager.load();
 
+        com.uwdie.stafftools.client.db.Database.init(
+                FabricLoader.getInstance()
+                        .getConfigDir()
+                        .resolve("stafftools.db")
+        );
+
+        com.uwdie.stafftools.client.db.DbCommand.register();
+
         Lang.setLanguage(
                 configManager.getConfig().getLanguage()
         );
@@ -79,6 +87,9 @@ public class StafftoolsClient implements ClientModInitializer {
         );
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+
+            // flush batched audit writes periodically
+            com.uwdie.stafftools.client.audit.AuditLog.flushDb();
 
             // the tab list is about to be wiped: whatever was learned
             // about it must not survive into the next server
